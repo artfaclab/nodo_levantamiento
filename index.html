@@ -2,6 +2,7 @@
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NODO · Levantamiento</title>
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-180.png"><meta name="theme-color" content="#141414"><meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -80,13 +81,17 @@ const TIPOS={
   contacto:{n:'Contacto',f:'punto',lado:1,c:[['altura','Altura']],def:{altura:300}},
   apagador:{n:'Apagador',f:'punto',lado:1,c:[['altura','Altura']],def:{altura:1200}}};
 const DE_FORMA={linea:['muro'],caja:['puerta','ventana','trabe','escalon','columna'],punto:['contacto','apagador']};
+const IC={inst:'<svg viewBox="0 0 24 24" width="20" height="20"><rect x="5" y="3" width="14" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9.5" cy="10" r="1.4" fill="currentColor"/><circle cx="14.5" cy="10" r="1.4" fill="currentColor"/><path d="M10 15h4" stroke="currentColor" stroke-width="2"/></svg>',
+ puerta:'<svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 21V3h12v18M3 21h18" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="15" cy="12" r="1.3" fill="currentColor"/></svg>',
+ ventana:'<svg viewBox="0 0 24 24" width="20" height="20"><rect x="4" y="5" width="16" height="13" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 5v13M4 11.5h16" stroke="currentColor" stroke-width="2"/></svg>',
+ estr:'<svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 5h18v4H3zM8 9v12M16 9v12" fill="none" stroke="currentColor" stroke-width="2"/></svg>'};
 const HERR={inst:{n:'Instalación',f:'punto',t:['contacto','apagador'],h:'Toca donde está el contacto o apagador.'},
   puerta:{n:'Puerta',f:'caja',t:['puerta'],h:'Arrastra sobre la puerta, de una esquina a la otra.'},
   ventana:{n:'Ventana',f:'caja',t:['ventana'],h:'Arrastra sobre la ventana.'},
   estr:{n:'Estructura',f:'caja',t:['columna','trabe','escalon'],h:'Arrastra sobre la columna, trabe o escalón.'}};
 const OPC={muro:['muro'],contacto:['contacto','apagador'],apagador:['contacto','apagador'],puerta:['puerta'],ventana:['ventana'],columna:['columna','trabe','escalon'],trabe:['columna','trabe','escalon'],escalon:['columna','trabe','escalon']};
 let HIST=[];const snap=()=>{const f=M().foto;if(f){HIST.push(JSON.stringify(f.marcas));if(HIST.length>40)HIST.shift()}};
-const COL={muro:'#c6f000',puerta:'#ff8a00',ventana:'#2fb6ff',trabe:'#c38bff',escalon:'#c38bff',columna:'#c38bff',contacto:'#2e6f8e',apagador:'#c8371e'};
+const COL={muro:'#c6f000',puerta:'#ff8a00',ventana:'#2fb6ff',trabe:'#c38bff',escalon:'#c38bff',columna:'#c38bff',contacto:'#4fc3f7',apagador:'#c8371e'};
 
 /* ---------- planta generada: largo y esquina de cada muro ---------- */
 function planta(es){
@@ -96,6 +101,12 @@ function planta(es){
   const cierre=pts.length>1?Math.hypot(pts[pts.length-1][0],pts[pts.length-1][1]):0;
   return{pts,falt,cierre:Math.round(cierre)}
 }
+function huecos(es){const {pts}=planta(es),out=[];
+  es.muros.forEach((w,i)=>{const a=pts[i],b=pts[i+1],L=Math.hypot(b[0]-a[0],b[1]-a[1])||1,d=[(b[0]-a[0])/L,(b[1]-a[1])/L],ni=[d[1],-d[0]];   // adentro: a la derecha del recorrido
+    const esc=w.largo?L/w.largo:1;
+    elems(w).forEach(e=>{if((e.tipo!=='puerta'&&e.tipo!=='ventana')||e.x==null||!e.ancho)return;const x0=e.x*esc,an=e.ancho*esc,P=t=>[a[0]+d[0]*t,a[1]+d[1]*t];
+      const h={tipo:e.tipo,p0:P(x0),p1:P(x0+an)};if(e.tipo==='puerta'){h.arco=[...Array(9)].map((_,k)=>{const th=k/8*Math.PI/2;return[h.p0[0]+an*(Math.cos(th)*d[0]+Math.sin(th)*ni[0]),h.p0[1]+an*(Math.cos(th)*d[1]+Math.sin(th)*ni[1])]})}
+      out.push(h)})});return out}
 function dibujaPlanta(svg,es,act){
   if(!svg)return;const W=svg.clientWidth,H=svg.clientHeight;if(!W)return;
   if(!es.muros.length){svg.innerHTML=`<text x="${W/2}" y="${H/2}" text-anchor="middle" fill="var(--mut)" font-size="14">La planta se arma sola al medir los muros</text>`;return}
@@ -109,6 +120,10 @@ function dibujaPlanta(svg,es,act){
     <line x1="${X(a[0])}" y1="${Y(a[1])}" x2="${X(b[0])}" y2="${Y(b[1])}" stroke="${on?'var(--ac)':w.largo?'var(--ink)':'var(--mut)'}" stroke-width="${on?6:3}" ${w.largo?'':'stroke-dasharray="6 5"'}/>
     <circle cx="${mx}" cy="${my}" r="13" fill="${on?'var(--ac)':'var(--pn)'}" stroke="var(--ink)"/><text x="${mx}" y="${my+5}" text-anchor="middle" font-size="13" font-weight="700" fill="${on?'#fff':'var(--ink)'}">${i+1}</text>
     ${w.largo?`<text x="${mx}" y="${my+30}" text-anchor="middle" font-size="12" fill="var(--mut)">${cm(w.largo)}</text>`:''}</g>`});
+  huecos(es).forEach(h=>{const s0=[X(h.p0[0]),Y(h.p0[1])],s1=[X(h.p1[0]),Y(h.p1[1])];
+    g+=`<line x1="${s0[0]}" y1="${s0[1]}" x2="${s1[0]}" y2="${s1[1]}" stroke="var(--pn)" stroke-width="8"/>`;
+    if(h.tipo==='puerta')g+=`<polyline points="${h.arco.map(q=>X(q[0])+','+Y(q[1])).join(' ')}" fill="none" stroke="var(--ac)" stroke-width="1.5"/><line x1="${s0[0]}" y1="${s0[1]}" x2="${X(h.arco[8][0])}" y2="${Y(h.arco[8][1])}" stroke="var(--ac)" stroke-width="2"/>`;
+    else{const L=Math.hypot(s1[0]-s0[0],s1[1]-s0[1])||1,nx=-(s1[1]-s0[1])/L*2.5,ny=(s1[0]-s0[0])/L*2.5;g+=[1,-1].map(k=>`<line x1="${s0[0]+nx*k}" y1="${s0[1]+ny*k}" x2="${s1[0]+nx*k}" y2="${s1[1]+ny*k}" stroke="var(--ok)" stroke-width="1.5"/>`).join('')}});
   pts.forEach((p,i)=>{if(es.cerrado&&i===pts.length-1)return;g+=`<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="4" fill="var(--ink)"/><text x="${X(p[0])+7}" y="${Y(p[1])-7}" font-size="11" font-weight="700" fill="var(--ok)">${LET(i)}</text>`});
   svg.innerHTML=g;
   svg.querySelectorAll('[data-m]').forEach(n=>n.onclick=()=>{V.m=+n.dataset.m;sel=-1;herr='sel';HIST=[];render(true);const q=$('mu'+n.dataset.m);if(q)q.scrollIntoView({block:'start'})});
@@ -137,20 +152,33 @@ function inicio(){
   $('bCargar').onclick=()=>$('fCargar').click();
   $('bar').innerHTML=`<button class="a" id="bEnv">Enviar</button>`;$('bEnv').onclick=enviar;
 }
+function problemas(es,w){const r=[],A=w.altura,L=w.largo;
+  if(L&&L>15000)r.push({t:`El ancho de ${cm(L)} cm parece mucho.`,k:'largo',v:Math.round(L/10)});
+  if(A&&A>5000)r.push({t:`El alto de ${cm(A)} cm parece mucho.`,k:'altura',v:Math.round(A/10)});
+  if(A&&A<1500)r.push({t:`El alto de ${cm(A)} cm parece poco.`});
+  elems(w).forEach(e=>{const n=TIPOS[e.tipo].n;
+    if(L&&e.x!=null&&(e.x<0||e.x+(e.ancho||0)>L+5))r.push({t:`${n}: se sale del muro (revisa distancia y ancho).`});
+    const top=(e.antepecho||0)+(e.alto||0);if(A&&(e.tipo==='puerta'||e.tipo==='ventana')&&top>A+5)r.push({t:`${n}: llega más alto que el muro.`});
+    if(A&&e.altura&&e.altura>A)r.push({t:`${n}: su altura pasa el alto del muro.`})});
+  return r}
+function elems(w){return(w.foto?w.foto.marcas:[]).filter(m=>m.tipo!=='muro').map(m=>{const d=m.datos,t=TIPOS[m.tipo],an=d.ancho||0;
+  let x=d.dist;if(x!=null&&d.lado==='der'&&w.largo)x=w.largo-x-(t.f==='caja'?an:0);const o={tipo:m.tipo,lado:d.lado,dist:d.dist,x};t.c.forEach(([k])=>o[k]=d[k]??null);return o})}
 const nuevoMuro=(alto=null)=>({largo:null,altura:alto,zoclo:0,esquina:'rincon',angulo:90,foto:null});
 function muroHtml(es,w,i){
-  const n=es.muros.length,act=i===V.m,f=w.foto;
+  const n=es.muros.length,act=i===V.m,f=w.foto,pr=problemas(es,w);
   return`<section class="pn" id="mu${i}" style="${act?'border-color:var(--ac);border-width:2px':''}">
-  <div class="row" style="justify-content:space-between"><h2 style="margin:0">Muro ${i+1}</h2><span class="${w.largo?'okt':'warn'}">${w.largo?'ancho '+cm(w.largo)+' cm':'falta el ancho'}</span></div>
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0">Muro ${i+1}</h2><span style="font-size:14px">${[['Foto',!!f],['Ancho',!!w.largo],['Alto',!!w.altura]].map(([l,ok])=>`<b style="color:${ok?'var(--ok)':'var(--ac)'}">${ok?'✓':'✗'} ${l}</b>`).join(' &nbsp;')}${pr.length?' &nbsp;<b style="color:var(--ac)">⚠</b>':''}</span></div>
   ${i>0?`<div class="row" style="margin-top:6px"><span class="hint" style="margin:0">Giro desde el muro ${i}:</span><button class="${es.muros[i-1].esquina==='saliente'?'p':'s'}" data-gir="izq" data-w="${i-1}" style="min-height:36px">←</button><button class="${es.muros[i-1].esquina!=='saliente'?'p':'s'}" data-gir="der" data-w="${i-1}" style="min-height:36px">→</button></div>`:''}
-  ${f?`<div class="foto" style="margin-top:8px"><canvas id="cv${i}" data-w="${i}"></canvas></div>
-   <div class="tools" style="grid-template-columns:repeat(3,minmax(0,1fr))">${Object.entries(HERR).map(([k,h])=>`<button class="${act&&herr===k?'on':'s'}" data-h="${k}" data-w="${i}">${h.n}</button>`).join('')}<button class="s" data-des="${i}" ${act&&HIST.length?'':'disabled'}>↶ Deshacer</button></div>
+  ${f?`<div class="foto" style="margin-top:8px"><canvas id="cv${i}" data-w="${i}"></canvas><button class="s" data-z1="${i}" style="position:absolute;top:8px;right:8px;display:none;min-height:36px;z-index:2">Ajustar</button></div>
+   <p class="hint" style="margin:4px 2px 0">Pellizca la foto con dos dedos para acercar.</p>
+   <div class="tools" style="grid-template-columns:repeat(3,minmax(0,1fr))">${Object.entries(HERR).map(([k,h])=>`<button class="${act&&herr===k?'on':'s'}" data-h="${k}" data-w="${i}" style="display:flex;gap:6px;align-items:center;justify-content:center">${IC[k]}${h.n}</button>`).join('')}<button class="s" data-des="${i}" ${act&&HIST.length?'':'disabled'}>↶ Deshacer</button></div>
    ${act?`<p class="hint">${herr==='sel'?'Elige qué vas a marcar, o toca una marca para ver sus medidas.':HERR[herr].h}</p>`:''}`
    :`<button class="vacio" data-tf="${i}" style="width:100%;margin-top:8px"><div><b style="font-size:18px">Tomar foto del muro ${i+1}</b><br><span class="hint">Párate frente al muro, de preferencia con el teléfono horizontal</span></div></button>`}
   <div id="ed${i}"></div>
   <div class="g3"><div><label for="wL${i}">Ancho (cm)</label><input id="wL${i}" data-w="${i}" data-k="largo" inputmode="decimal" value="${cm(w.largo)}"></div>
    <div><label for="wA${i}">Alto (cm)</label><input id="wA${i}" data-w="${i}" data-k="altura" inputmode="decimal" value="${cm(w.altura)}"></div>
    <div><label for="wZ${i}">Zoclo (cm)</label><input id="wZ${i}" data-w="${i}" data-k="zoclo" inputmode="decimal" placeholder="sin" value="${w.zoclo?cm(w.zoclo):''}"></div></div>
+  ${pr.map(q=>`<p class="warn" style="margin:6px 0 0">⚠ ${esc(q.t)}${q.k?` <button class="s" data-fix="${i}" data-k="${q.k}" data-v="${q.v}" style="min-height:34px">Usar ${cm(q.v)}</button>`:''}</p>`).join('')}
   <div class="row" style="margin-top:8px;justify-content:flex-end">${f?`<button class="s" data-tf="${i}">Otra foto</button>`:''}<button class="s" data-bm="${i}">Borrar muro</button></div>
   </section>`}
 function espacio(){
@@ -182,6 +210,8 @@ function espacio(){
   document.querySelectorAll('[data-des]').forEach(b=>b.onclick=()=>{const i=+b.dataset.des;if(V.m!==i||!HIST.length)return;es.muros[i].foto.marcas=JSON.parse(HIST.pop());sel=-1;guardar();render(true)});
   document.querySelectorAll('[data-tf]').forEach(b=>b.onclick=()=>{activa(+b.dataset.tf);$('fFoto').click()});
   document.querySelectorAll('[data-gir]').forEach(b=>b.onclick=()=>{const i=+b.dataset.w;es.muros[i].esquina=b.dataset.gir==='der'?'rincon':'saliente';guardar();render(true)});
+  document.querySelectorAll('[data-z1]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();Z[+b.dataset.z1]={s:1,x:0,y:0};aplicaZoom(+b.dataset.z1)});
+  document.querySelectorAll('[data-fix]').forEach(b=>b.onclick=()=>{const w=es.muros[+b.dataset.fix];w[b.dataset.k]=+b.dataset.v;guardar();render(true)});
   document.querySelectorAll('[data-bm]').forEach(b=>b.onclick=()=>{if(b.dataset.c){es.muros.splice(+b.dataset.bm,1);V.m=0;sel=-1;HIST=[];guardar();render(true)}else{b.dataset.c=1;b.textContent='¿Seguro?'}});
   $('eCe').onchange=ev=>{es.cerrado=ev.target.checked;guardar();render(true)};
   $('bFG').onclick=()=>$('fFotos').click();
@@ -214,17 +244,25 @@ function dibujaMarcas(x,marcas,W,H,s,esc1,etiq){
     const t=etiq?etiq(m):'';if(!t)return;const tw=x.measureText(t).width;tx=Math.max(4,Math.min(tx,W-tw-8));ty=Math.max(fs+4,ty);
     x.fillStyle='rgba(0,0,0,.72)';x.fillRect(tx-4,ty-fs,tw+8,fs*1.25);x.fillStyle=c;x.fillText(t,tx,ty)});
 }
+const Z={};
+function aplicaZoom(i){const c=$('cv'+i),z=Z[i];if(!c)return;if(!z||z.s<=1.01){c.style.transform='';Z[i]={s:1,x:0,y:0};const b=document.querySelector(`[data-z1="${i}"]`);if(b)b.style.display='none';return}
+  const W=c.parentElement.clientWidth,H=c.parentElement.clientHeight;z.x=Math.min(0,Math.max(W-W*z.s,z.x));z.y=Math.min(0,Math.max(H-H*z.s,z.y));c.style.transformOrigin='0 0';c.style.transform=`translate(${z.x}px,${z.y}px) scale(${z.s})`;const b=document.querySelector(`[data-z1="${i}"]`);if(b)b.style.display='block'}
 function eventos(i){
-  const c=$('cv'+i);if(!c)return;let ini=null,tmp=null;
+  const c=$('cv'+i);if(!c)return;let ini=null,tmp=null;const dedos=new Map();let pinch=null;aplicaZoom(i);
+  const cont=c.parentElement;
+  cont.addEventListener('pointerdown',ev=>{dedos.set(ev.pointerId,[ev.clientX,ev.clientY]);if(dedos.size===2){ini=null;tmp=null;pinta(i);const [p1,p2]=[...dedos.values()],r=cont.getBoundingClientRect(),z=Z[i]||{s:1,x:0,y:0};pinch={d:Math.hypot(p2[0]-p1[0],p2[1]-p1[1]),m:[(p1[0]+p2[0])/2-r.left,(p1[1]+p2[1])/2-r.top],z:{...z}}}},true);
+  cont.addEventListener('pointermove',ev=>{if(!dedos.has(ev.pointerId))return;dedos.set(ev.pointerId,[ev.clientX,ev.clientY]);if(pinch&&dedos.size>=2){const [p1,p2]=[...dedos.values()],r=cont.getBoundingClientRect(),d=Math.hypot(p2[0]-p1[0],p2[1]-p1[1]),m=[(p1[0]+p2[0])/2-r.left,(p1[1]+p2[1])/2-r.top];
+    const s=Math.max(1,Math.min(5,pinch.z.s*d/pinch.d)),f=s/pinch.z.s;Z[i]={s,x:m[0]-(pinch.m[0]-pinch.z.x)*f,y:m[1]-(pinch.m[1]-pinch.z.y)*f};aplicaZoom(i);ev.stopPropagation()}},true);
+  const suelta=ev=>{dedos.delete(ev.pointerId);if(dedos.size<2)pinch=null};cont.addEventListener('pointerup',suelta,true);cont.addEventListener('pointercancel',suelta,true);
   const pos=ev=>{const r=c.getBoundingClientRect();return[(ev.clientX-r.left)/r.width,(ev.clientY-r.top)/r.height]};
-  c.onpointerdown=ev=>{const p=pos(ev);
+  c.onpointerdown=ev=>{if(dedos.size>1)return;const p=pos(ev);
     if(V.m!==i){V.m=i;sel=-1;herr='sel';HIST=[];render(true);return}
     if(herr==='sel'){sel=busca(p);pinta(i);editor();return}
     c.setPointerCapture(ev.pointerId);
     const H=HERR[herr];if(H.f==='punto'){agrega({forma:'punto',p:[p[0],p[1]]},H.t[0]);return}
     ini=p;tmp={forma:H.f,p:[p[0],p[1],p[0],p[1]],tipo:H.t[0]}};
-  c.onpointermove=ev=>{if(!ini)return;const p=pos(ev);tmp.p=[ini[0],ini[1],p[0],p[1]];pinta(i);dibujaMarcas(c.getContext('2d'),[tmp],c.width,c.height,0,1,null)};
-  c.onpointerup=ev=>{if(!ini)return;const p=pos(ev),q=ini,f=tmp.forma,t=tmp.tipo;ini=null;tmp=null;if(Math.hypot(p[0]-q[0],p[1]-q[1])<.03){pinta(i);return}agrega({forma:f,p:[q[0],q[1],p[0],p[1]]},t)};
+  c.onpointermove=ev=>{if(!ini||dedos.size>1)return;const p=pos(ev);tmp.p=[ini[0],ini[1],p[0],p[1]];pinta(i);dibujaMarcas(c.getContext('2d'),[tmp],c.width,c.height,0,1,null)};
+  c.onpointerup=ev=>{if(!ini||pinch)return;const p=pos(ev),q=ini,f=tmp.forma,t=tmp.tipo;ini=null;tmp=null;if(Math.hypot(p[0]-q[0],p[1]-q[1])<.03){pinta(i);return}agrega({forma:f,p:[q[0],q[1],p[0],p[1]]},t)};
 }
 function busca(p){const ms=M().foto.marcas;let best=-1,bd=.06;
   ms.forEach((m,i)=>{let d;if(m.forma==='punto')d=Math.hypot(p[0]-m.p[0],p[1]-m.p[1]);
@@ -253,7 +291,7 @@ function editor(){
 
 /* ---------- fotos ---------- */
 function comprime(file,max=1600){return new Promise((ok,mal)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{const r=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*r);c.height=Math.round(im.height*r);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL('image/jpeg',.72))};im.onerror=mal;im.src=u})}
-$('fFoto').onchange=async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;try{const img=await comprime(f);const w=M();w.foto={img,marcas:w.foto?w.foto.marcas:[]};herr='sel';guardar();render(true);aviso('Marca puertas, ventanas, instalaciones o estructura sobre la foto')}catch(e){aviso('No se pudo leer la foto')}};
+$('fFoto').onchange=async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;try{const img=await comprime(f,1280);const w=M();w.foto={img,marcas:w.foto?w.foto.marcas:[]};herr='sel';guardar();render(true);aviso('Marca puertas, ventanas, instalaciones o estructura sobre la foto')}catch(e){aviso('No se pudo leer la foto')}};
 $('fFotos').onchange=async ev=>{const es=E();for(const f of ev.target.files){try{es.fotos.push({img:await comprime(f,1280)})}catch(e){}}ev.target.value='';guardar();render(true)};
 $('fCargar').onchange=async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;try{const d=JSON.parse(await f.text());if(d.formato!=='NODO-ESPACIO'||d.version!==2)throw 0;P=d.fuente||d;guardar();V={v:'inicio'};render();aviso('Levantamiento cargado')}catch(e){aviso('Ese archivo no es un levantamiento de esta versión')}};
 
@@ -265,14 +303,12 @@ async function exportar(){
     const altos=es.muros.map(w=>w.altura).filter(Boolean),amin=altos.length?Math.min(...altos):2400;
     out.espacios.push({nombre:es.nombre,altura:amin,espesor:es.espesor||150,abierta:!cer,cierre:cer?pl.cierre:null,vertices:vert,
       muros:es.muros.map((w,i)=>({n:i+1,largo:w.largo,altura:w.altura||amin,espesor:es.espesor||150,zoclo:w.zoclo||0,esquina:w.esquina,angulo:w.angulo||90,
-        elementos:(w.foto?w.foto.marcas:[]).filter(m=>m.tipo!=='muro').map(m=>{const d=m.datos,t=TIPOS[m.tipo],an=d.ancho||0;
-          let x=d.dist;if(x!=null&&d.lado==='der'&&w.largo)x=w.largo-x-(t.f==='caja'?an:0);
-          const o={tipo:m.tipo,lado:d.lado,dist:d.dist,x};t.c.forEach(([k])=>o[k]=d[k]??null);return o})})),
+        elementos:elems(w)})),
       fotos:[...acot,...es.fotos.map(f=>({muro:null,img:f.img}))]})}
   return out}
-async function fotoAcotada(w,es){const im=new Image();await new Promise(r=>{im.onload=r;im.onerror=r;im.src=w.foto.img});const c=document.createElement('canvas');c.width=im.width||1600;c.height=im.height||1200;const x=c.getContext('2d');try{x.drawImage(im,0,0)}catch(e){}
+async function fotoAcotada(w,es){const im=new Image();await new Promise(r=>{im.onload=r;im.onerror=r;im.src=w.foto.img});const r0=Math.min(1,1280/Math.max(im.width||1280,im.height||1280)),c=document.createElement('canvas');c.width=Math.round((im.width||1280)*r0);c.height=Math.round((im.height||960)*r0);const x=c.getContext('2d');try{x.drawImage(im,0,0,c.width,c.height)}catch(e){}
   dibujaMarcas(x,w.foto.marcas,c.width,c.height,-1,1,m=>etiquetaDe(w,m,es));
-  return c.toDataURL('image/jpeg',.8)}
+  return c.toDataURL('image/jpeg',.7)}
 function pdf(out){
   if(!window.jspdf)return null;const doc=new window.jspdf.jsPDF({unit:'mm',format:'letter'}),W=216,H=279,mg=16;let y;
   const txt=(t,x,yy,s=11,b=false)=>{doc.setFont('helvetica',b?'bold':'normal');doc.setFontSize(s);doc.text(String(t),x,yy)};
@@ -284,12 +320,20 @@ function pdf(out){
     const k=Math.min(bx[2]/Math.max(Math.max(...xs)-Math.min(...xs),1),bx[3]/Math.max(Math.max(...ys)-Math.min(...ys),1))*.85,ox=bx[0]+(bx[2]-(Math.max(...xs)-Math.min(...xs))*k)/2-Math.min(...xs)*k,oy=bx[1]+(bx[3]-(Math.max(...ys)-Math.min(...ys))*k)/2-Math.min(...ys)*k;
     doc.setLineWidth(.8);src.muros.forEach((w,i)=>{const a=pts[i],b=pts[i+1];doc.line(ox+a[0]*k,oy+a[1]*k,ox+b[0]*k,oy+b[1]*k);txt(`${i+1}: ${cm(w.largo)||'?'}`,ox+(a[0]+b[0])/2*k+2,oy+(a[1]+b[1])/2*k-2,9,true)});
     pts.forEach((p,i)=>{if(!(src.cerrado&&i===pts.length-1))txt(LET(i),ox+p[0]*k+1.5,oy+p[1]*k-1.5,8)});
+    const PX=q=>[ox+q[0]*k,oy-q[1]*k];
+    huecos(src).forEach(h=>{const a=PX(h.p0),b=PX(h.p1);doc.setDrawColor(255,255,255);doc.setLineWidth(1.6);doc.line(a[0],a[1],b[0],b[1]);doc.setDrawColor(0,0,0);doc.setLineWidth(.25);
+      if(h.tipo==='puerta'){const ar=h.arco.map(PX);for(let j=0;j<ar.length-1;j++)doc.line(ar[j][0],ar[j][1],ar[j+1][0],ar[j+1][1]);doc.line(a[0],a[1],ar[8][0],ar[8][1])}
+      else{const L=Math.hypot(b[0]-a[0],b[1]-a[1])||1,nx=-(b[1]-a[1])/L*.6,ny=(b[0]-a[0])/L*.6;[1,-1].forEach(q=>doc.line(a[0]+nx*q,a[1]+ny*q,b[0]+nx*q,b[1]+ny*q))}});
+    doc.setLineWidth(.8);
     y=170;es.muros.forEach(w=>{if(y>H-20){doc.addPage();y=22}txt(`Muro ${w.n}: ancho ${cm(w.largo)||'?'} · alto ${cm(w.altura)}${w.zoclo?` · zoclo ${cm(w.zoclo)}`:''} · ${w.esquina==='saliente'?'gira a la izquierda':'gira a la derecha'}`,mg,y,10,true);y+=6;
       w.elementos.forEach(e=>{const t=TIPOS[e.tipo];txt(`   ${t.n}: ${t.c.map(([k2,l])=>`${l.split(' (')[0].toLowerCase()} ${cm(e[k2])||'?'}`).join(', ')}${e.dist!=null?`, a ${cm(e.dist)} de la esquina ${e.lado==='der'?'derecha':'izquierda'}`:''}`,mg,y,9);y+=5});y+=2});
     es.fotos.forEach(f=>{doc.addPage();txt(`${es.nombre} · ${f.muro?'Muro '+f.muro:'Foto general'}`,mg,20,13,true);const pr=doc.getImageProperties(f.img),mw=W-2*mg,mh=H-50,r=Math.min(mw/pr.width,mh/pr.height);doc.addImage(f.img,'JPEG',mg,28,pr.width*r,pr.height*r)})});
   txt('NODO · dev.rk',mg,H-8,8);return doc.output('blob')}
+let okEnv=0;
 async function enviar(){
   if(!P.espacios.length){aviso('Agrega al menos un espacio');return}
+  const falt=[];P.espacios.forEach(es=>es.muros.forEach((w,i)=>{const q=[];if(!w.foto)q.push('foto');if(!w.largo)q.push('ancho');if(!w.altura)q.push('alto');if(problemas(es,w).length)q.push('revisar ⚠');if(q.length)falt.push(`${es.nombre} muro ${i+1}: ${q.join(', ')}`)}));
+  if(falt.length&&Date.now()-okEnv>8000){okEnv=Date.now();aviso('Falta: '+falt.slice(0,3).join(' · ')+(falt.length>3?' …':'')+'. Toca Enviar otra vez para mandarlo así.');return}
   aviso('Preparando archivos…');const out=await exportar(),base=((P.proyecto||'levantamiento').trim().replace(/[^\w\- ]+/g,'').replace(/\s+/g,'_')||'levantamiento')+'_'+P.fecha.replace(/\//g,'-');
   out.fuente=P;const data=JSON.stringify(out);let pb=null;try{pb=pdf(out)}catch(e){}
   const files=[new File([data],base+'.espacio',{type:'application/octet-stream'})];if(pb)files.push(new File([pb],base+'.pdf',{type:'application/pdf'}));
@@ -300,6 +344,7 @@ async function enviar(){
 }
 window.addEventListener('resize',()=>{if(V.v==='espacio')dibujaPlanta($('pl'),E(),-1)});
 render();
+if('serviceWorker' in navigator&&location.protocol==='https:'&&!(window.claude&&window.claude.use))navigator.serviceWorker.register('sw.js').catch(()=>{});
 if(window.claude&&window.claude.use)window.claude.use('downloads').then(d=>{dl=d}).catch(()=>{});
 }
 </script></body></html>
