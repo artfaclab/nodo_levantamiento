@@ -78,6 +78,13 @@ const TIPOS={
   contacto:{n:'Contacto',f:'punto',lado:1,c:[['altura','Altura']],def:{altura:300}},
   apagador:{n:'Apagador',f:'punto',lado:1,c:[['altura','Altura']],def:{altura:1200}}};
 const DE_FORMA={linea:['muro'],caja:['puerta','ventana','trabe','escalon','columna'],punto:['contacto','apagador']};
+const HERR={lineal:{n:'Medida lineal',f:'linea',t:['muro'],h:'Arrastra a lo largo del muro, de esquina a esquina.'},
+  inst:{n:'Instalación',f:'punto',t:['contacto','apagador'],h:'Toca donde está el contacto o apagador.'},
+  puerta:{n:'Puerta',f:'caja',t:['puerta'],h:'Arrastra sobre la puerta, de una esquina a la otra.'},
+  ventana:{n:'Ventana',f:'caja',t:['ventana'],h:'Arrastra sobre la ventana.'},
+  estr:{n:'Estructura',f:'caja',t:['columna','trabe','escalon'],h:'Arrastra sobre la columna, trabe o escalón.'}};
+const OPC={muro:['muro'],contacto:['contacto','apagador'],apagador:['contacto','apagador'],puerta:['puerta'],ventana:['ventana'],columna:['columna','trabe','escalon'],trabe:['columna','trabe','escalon'],escalon:['columna','trabe','escalon']};
+let HIST=[];const snap=()=>{const f=M().foto;if(f){HIST.push(JSON.stringify(f.marcas));if(HIST.length>40)HIST.shift()}};
 const COL={muro:'#c6f000',puerta:'#ff8a00',ventana:'#2fb6ff',trabe:'#c38bff',escalon:'#c38bff',columna:'#c38bff',contacto:'#2e6f8e',apagador:'#c8371e'};
 
 /* ---------- planta generada: largo y esquina de cada muro ---------- */
@@ -103,7 +110,7 @@ function dibujaPlanta(svg,es,act){
     ${w.largo?`<text x="${mx}" y="${my+30}" text-anchor="middle" font-size="12" fill="var(--mut)">${cm(w.largo)}</text>`:''}</g>`});
   pts.forEach((p,i)=>{if(es.cerrado&&i===pts.length-1)return;g+=`<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="4" fill="var(--ink)"/><text x="${X(p[0])+7}" y="${Y(p[1])-7}" font-size="11" font-weight="700" fill="var(--ok)">${LET(i)}</text>`});
   svg.innerHTML=g;
-  svg.querySelectorAll('[data-m]').forEach(n=>n.onclick=()=>{V={v:'muro',e:V.e,m:+n.dataset.m};sel=-1;render()});
+  svg.querySelectorAll('[data-m]').forEach(n=>n.onclick=()=>{V={v:'muro',e:V.e,m:+n.dataset.m};sel=-1;HIST=[];render()});
 }
 
 /* ---------- vistas ---------- */
@@ -128,7 +135,7 @@ function espacio(){
   $('app').innerHTML=`
   <div class="row" style="justify-content:space-between;margin-bottom:8px"><input id="eNom" value="${esc(es.nombre)}" style="flex:1;font-weight:700"><button class="s" id="bBE">Borrar</button></div>
   <div class="plan"><svg id="pl"></svg></div>
-  <p class="hint">Empieza por el muro de la entrada y avanza hacia tu derecha. Toca un muro para medirlo.</p>
+  <p class="hint">Empieza por el muro de la entrada y recorre el cuarto siempre hacia tu derecha. Al terminar cada muro, la flecha indica hacia dónde giras para ver el siguiente. Toca un muro para medirlo.</p>
   ${es.muros.length?`<p class="${pl.falt?'warn':'okt'}">${pl.falt?`Faltan ${pl.falt} largo(s) por medir.`:es.cerrado&&pl.cierre>20?`Nota: la planta no cierra por ${cm(pl.cierre)} cm.`:'Muros medidos.'}</p>`:''}
   ${es.muros.map((w,i)=>`<button class="lst" data-m="${i}"><b>Muro ${i+1}</b><span class="${w.largo?'ok':'x'}">${w.largo?cm(w.largo)+' cm':'sin largo'}${w.foto?' · foto':''}${w.foto&&w.foto.marcas.length?' · '+w.foto.marcas.length+' marcas':''}</span></button>`).join('')}
   <button class="p" id="bNM" style="width:100%">+ Agregar muro ${es.muros.length+1}</button>
@@ -138,7 +145,7 @@ function espacio(){
   dibujaPlanta($('pl'),es,-1);
   $('eNom').oninput=ev=>{es.nombre=ev.target.value;guardar()};
   $('bBE').onclick=ev=>{const b=ev.target;if(b.dataset.c){P.espacios.splice(V.e,1);guardar();V={v:'inicio'};render()}else{b.dataset.c=1;b.textContent='¿Seguro?'}};
-  document.querySelectorAll('button[data-m]').forEach(b=>b.onclick=()=>{V={v:'muro',e:V.e,m:+b.dataset.m};sel=-1;render()});
+  document.querySelectorAll('button[data-m]').forEach(b=>b.onclick=()=>{V={v:'muro',e:V.e,m:+b.dataset.m};sel=-1;HIST=[];render()});
   $('bNM').onclick=()=>{es.muros.push({largo:null,altura:null,zoclo:0,esquina:'rincon',angulo:90,foto:null});guardar();V={v:'muro',e:V.e,m:es.muros.length-1};sel=-1;render()};
   $('eAl').onchange=ev=>{es.altura=mm(ev.target.value)||es.altura;guardar()};$('eEs').onchange=ev=>{es.espesor=mm(ev.target.value)||es.espesor;guardar()};
   $('eCe').onchange=ev=>{es.cerrado=ev.target.checked;guardar();render()};
@@ -151,15 +158,14 @@ function muro(){
   $('app').innerHTML=`
   <h2>Muro ${i+1} <small style="font-size:15px;color:var(--mut);font-weight:400">de ${n} · ${esc(es.nombre)}</small></h2>
   ${f?`<div class="foto" id="fw"><canvas id="cv"></canvas></div>
-   <div class="tools">${[['sel','Elegir'],['linea','Línea'],['caja','Caja'],['punto','Punto']].map(([k,l])=>`<button class="${herr===k?'on':'s'}" data-h="${k}">${l}</button>`).join('')}</div>
-   <p class="hint">${{sel:'Toca una marca para ver o cambiar sus medidas.',linea:'Arrastra a lo largo del muro, de esquina a esquina.',caja:'Arrastra sobre la puerta, ventana, trabe, escalón o columna.',punto:'Toca donde está el contacto o apagador.'}[herr]}</p>`
+   <div class="tools" style="grid-template-columns:repeat(3,minmax(0,1fr))">${Object.entries(HERR).map(([k,h])=>`<button class="${herr===k?'on':'s'}" data-h="${k}">${h.n}</button>`).join('')}<button class="s" id="bDes" ${HIST.length?'':'disabled'}>↶ Deshacer</button></div>
+   <p class="hint">${herr==='sel'?'Elige qué vas a marcar, o toca una marca para ver sus medidas.':HERR[herr].h}</p>`
    :`<button class="vacio" id="bTF" style="width:100%"><div><b style="font-size:18px">Tomar foto del muro ${i+1}</b><br><span class="hint">Párate frente al muro, de preferencia con el teléfono horizontal</span></div></button>`}
   <div id="ed"></div>
   <div class="pn"><div class="g3"><div><label for="wL">Largo (cm)</label><input id="wL" inputmode="decimal" value="${cm(w.largo)}"></div>
    <div><label for="wA">Altura (cm)</label><input id="wA" inputmode="decimal" placeholder="${cm(es.altura)}" value="${cm(w.altura)}"></div>
    <div><label for="wZ">Zoclo (cm)</label><input id="wZ" inputmode="decimal" placeholder="sin" value="${w.zoclo?cm(w.zoclo):''}"></div></div>
-   <label for="wE">Esquina con el muro ${i<n-1||!es.cerrado?i+2:1}</label>
-   <select id="wE"><option value="rincon" ${w.esquina!=='saliente'?'selected':''}>Rincón (el muro siguiente regresa hacia el cuarto)</option><option value="saliente" ${w.esquina==='saliente'?'selected':''}>Esquina saliente (el muro siguiente sale)</option></select>
+   <p class="hint">Para pasar al muro ${i+2}: ¿hacia dónde giras para verlo de frente? Usa la flecha de abajo.</p>
    ${av?`<label for="wG">Ángulo de la esquina (°)</label><input id="wG" inputmode="decimal" value="${w.angulo||90}">`:''}
    <div class="row" style="margin-top:10px"><button class="s" id="bVP">Vista planta</button>${f?'<button class="s" id="bOF">Otra foto</button>':''}<button class="s" id="bAv">${av?'Ocultar ángulo':'Ángulo distinto a 90°'}</button><button class="s" id="bBM">Borrar muro</button></div></div>
   <div class="plan hid" id="vp"><svg id="pl"></svg></div>`;
@@ -167,16 +173,18 @@ function muro(){
   editor();
   const num=(id,fn)=>$(id).onchange=ev=>{fn(mm(ev.target.value));guardar();if(f)pinta()};
   num('wL',v=>w.largo=v);num('wA',v=>w.altura=v);num('wZ',v=>w.zoclo=v||0);
-  $('wE').onchange=ev=>{w.esquina=ev.target.value;guardar();dibujaPlanta($('pl'),es,i)};
   if(av)$('wG').onchange=ev=>{const a=parseFloat(ev.target.value);w.angulo=isFinite(a)&&a>0&&a<180?a:90;guardar();dibujaPlanta($('pl'),es,i)};
   $('bAv').onclick=()=>{av=!av;render()};
   $('bVP').onclick=()=>{$('vp').classList.toggle('hid');dibujaPlanta($('pl'),es,i)};
   $('bBM').onclick=ev=>{const b=ev.target;if(b.dataset.c){es.muros.splice(i,1);guardar();V={v:'espacio',e:V.e};render()}else{b.dataset.c=1;b.textContent='¿Seguro?'}};
   if($('bTF'))$('bTF').onclick=()=>$('fFoto').click();if($('bOF'))$('bOF').onclick=()=>$('fFoto').click();
-  document.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>{herr=b.dataset.h;render()});
-  $('bar').innerHTML=`<button class="s" id="bEs">‹ Espacio</button><button class="s" id="bAn" ${i==0?'disabled':''}>Anterior</button><button class="p" id="bSi">${i<n-1?'Muro '+(i+2):'+ Muro '+(i+2)}</button>`;
-  $('bEs').onclick=()=>{V={v:'espacio',e:V.e};render()};$('bAn').onclick=()=>{V.m--;sel=-1;render()};
-  $('bSi').onclick=()=>{if(i==n-1)es.muros.push({largo:null,altura:null,zoclo:0,esquina:'rincon',angulo:90,foto:null});V.m++;sel=-1;herr='sel';guardar();render()};
+  document.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>{herr=herr===b.dataset.h?'sel':b.dataset.h;render()});
+  if($('bDes'))$('bDes').onclick=()=>{const f=M().foto;if(!HIST.length||!f)return;f.marcas=JSON.parse(HIST.pop());sel=-1;guardar();render()};
+  const sig=i+2,der=w.esquina!=='saliente',hay=i<n-1;
+  $('bar').innerHTML=`<button class="s" id="bEs" title="Espacio">☰</button><button class="s" id="bAn" ${i==0?'disabled':''}>‹ Anterior</button><button class="${hay&&!der?'p':'s'}" id="bIz">← Muro ${sig}</button><button class="${hay&&der?'p':'s'}" id="bDe">Muro ${sig} →</button>`;
+  $('bEs').onclick=()=>{V={v:'espacio',e:V.e};render()};$('bAn').onclick=()=>{V.m--;sel=-1;HIST=[];render()};
+  const ir=lado=>{w.esquina=lado==='der'?'rincon':'saliente';if(!hay)es.muros.push({largo:null,altura:null,zoclo:0,esquina:'rincon',angulo:90,foto:null});V.m++;sel=-1;herr='sel';HIST=[];guardar();render()};
+  $('bIz').onclick=()=>ir('izq');$('bDe').onclick=()=>ir('der');
 }
 
 /* ---------- foto acotada ---------- */
@@ -210,35 +218,35 @@ function eventos(){
   const pos=ev=>{const r=c.getBoundingClientRect();return[(ev.clientX-r.left)/r.width,(ev.clientY-r.top)/r.height]};
   c.onpointerdown=ev=>{c.setPointerCapture(ev.pointerId);const p=pos(ev);
     if(herr==='sel'){sel=busca(p);pinta();editor();return}
-    if(herr==='punto'){agrega({forma:'punto',p:[p[0],p[1]]});return}
-    ini=p;tmp={forma:herr,p:[p[0],p[1],p[0],p[1]],tipo:herr==='linea'?'muro':'puerta'}};
+    const H=HERR[herr];if(H.f==='punto'){agrega({forma:'punto',p:[p[0],p[1]]},H.t[0]);return}
+    ini=p;tmp={forma:H.f,p:[p[0],p[1],p[0],p[1]],tipo:H.t[0]}};
   c.onpointermove=ev=>{if(!ini)return;const p=pos(ev);tmp.p=[ini[0],ini[1],p[0],p[1]];pinta();const x=c.getContext('2d');dibujaMarcas(x,[tmp],c.width,c.height,0,1,()=>'')};
-  c.onpointerup=ev=>{if(!ini)return;const p=pos(ev),q=ini,f=tmp.forma;ini=null;tmp=null;if(Math.hypot(p[0]-q[0],p[1]-q[1])<.03){pinta();return}agrega({forma:f,p:[q[0],q[1],p[0],p[1]]})};
+  c.onpointerup=ev=>{if(!ini)return;const p=pos(ev),q=ini,f=tmp.forma,t=tmp.tipo;ini=null;tmp=null;if(Math.hypot(p[0]-q[0],p[1]-q[1])<.03){pinta();return}agrega({forma:f,p:[q[0],q[1],p[0],p[1]]},t)};
 }
 function busca(p){const ms=M().foto.marcas;let best=-1,bd=.06;
   ms.forEach((m,i)=>{let d;if(m.forma==='punto')d=Math.hypot(p[0]-m.p[0],p[1]-m.p[1]);
     else if(m.forma==='caja'){const [a,b,c2,d2]=m.p,inx=p[0]>=Math.min(a,c2)&&p[0]<=Math.max(a,c2),iny=p[1]>=Math.min(b,d2)&&p[1]<=Math.max(b,d2);d=inx&&iny?.02:1}
     else{const [x1,y1,x2,y2]=m.p,L=Math.hypot(x2-x1,y2-y1)||1e-6,t=Math.max(0,Math.min(1,((p[0]-x1)*(x2-x1)+(p[1]-y1)*(y2-y1))/L/L));d=Math.hypot(p[0]-(x1+t*(x2-x1)),p[1]-(y1+t*(y2-y1)))}
     if(d<bd){bd=d;best=i}});return best}
-function agrega(m){const tipo=DE_FORMA[m.forma][0],t=TIPOS[tipo];m.tipo=tipo;m.datos=Object.assign({lado:'izq',dist:null},t.def||{});
+function agrega(m,tipo){snap();tipo=tipo||DE_FORMA[m.forma][0];const t=TIPOS[tipo];m.tipo=tipo;m.datos=Object.assign({lado:'izq',dist:null},t.def||{});
   const ms=M().foto.marcas;ms.push(m);sel=ms.length-1;herr='sel';guardar();render()}
 function editor(){
   const ed=$('ed');if(!ed)return;const w=M(),f=w.foto;if(!f||sel<0||!f.marcas[sel]){ed.innerHTML=f&&f.marcas.length?`<p class="hint">${f.marcas.length} marca(s). Elige una para revisar sus medidas.</p>`:'';return}
   const m=f.marcas[sel],t=TIPOS[m.tipo],d=m.datos;
-  ed.innerHTML=`<div class="pn"><div class="g2"><div><label for="mT">Qué es</label><select id="mT">${DE_FORMA[m.forma].map(k=>`<option value="${k}" ${k===m.tipo?'selected':''}>${TIPOS[k].n}</option>`).join('')}</select></div>
+  ed.innerHTML=`<div class="pn"><div class="g2"><div><label for="mT">Qué es</label><select id="mT">${(OPC[m.tipo]||[m.tipo]).map(k=>`<option value="${k}" ${k===m.tipo?'selected':''}>${TIPOS[k].n}</option>`).join('')}</select></div>
     ${t.lado?`<div><label for="mL">Esquina más cercana</label><select id="mL"><option value="izq" ${d.lado!=='der'?'selected':''}>Izquierda</option><option value="der" ${d.lado==='der'?'selected':''}>Derecha</option></select></div>`:'<div></div>'}</div>
     <div class="g3">${m.tipo==='muro'?`<div><label for="mV_largo">Largo (cm)</label><input id="mV_largo" inputmode="decimal" value="${cm(w.largo)}"></div>`:
       (t.lado?`<div><label for="mV_dist">Distancia a esa esquina</label><input id="mV_dist" inputmode="decimal" value="${cm(d.dist)}"></div>`:'')+t.c.map(([k,l])=>`<div><label for="mV_${k}">${l}</label><input id="mV_${k}" inputmode="decimal" value="${cm(d[k])}"></div>`).join('')}</div>
     <div class="row" style="margin-top:10px;justify-content:space-between"><span class="hint">Medidas en cm</span><button class="s" id="mX">Borrar marca</button></div></div>`;
-  $('mT').onchange=ev=>{m.tipo=ev.target.value;m.datos=Object.assign({lado:d.lado||'izq',dist:d.dist??null},TIPOS[m.tipo].def||{});guardar();pinta();editor()};
-  if($('mL'))$('mL').onchange=ev=>{d.lado=ev.target.value;guardar();pinta()};
-  ed.querySelectorAll('input[id^="mV_"]').forEach(inp=>inp.onchange=ev=>{const k=inp.id.slice(3),v=mm(ev.target.value);if(k==='largo'){w.largo=v;$('wL').value=cm(v)}else d[k]=v;guardar();pinta()});
-  $('mX').onclick=()=>{f.marcas.splice(sel,1);sel=-1;guardar();pinta();editor()};
+  $('mT').onchange=ev=>{snap();m.tipo=ev.target.value;m.datos=Object.assign({lado:d.lado||'izq',dist:d.dist??null},TIPOS[m.tipo].def||{});guardar();pinta();editor()};
+  if($('mL'))$('mL').onchange=ev=>{snap();d.lado=ev.target.value;guardar();pinta()};
+  ed.querySelectorAll('input[id^="mV_"]').forEach(inp=>inp.onchange=ev=>{snap();const k=inp.id.slice(3),v=mm(ev.target.value);if(k==='largo'){w.largo=v;$('wL').value=cm(v)}else d[k]=v;guardar();pinta()});
+  $('mX').onclick=()=>{snap();f.marcas.splice(sel,1);sel=-1;guardar();render()};
 }
 
 /* ---------- fotos ---------- */
 function comprime(file,max=1600){return new Promise((ok,mal)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{const r=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*r);c.height=Math.round(im.height*r);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL('image/jpeg',.72))};im.onerror=mal;im.src=u})}
-$('fFoto').onchange=async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;try{const img=await comprime(f);const w=M();w.foto={img,marcas:w.foto?w.foto.marcas:[]};herr='linea';guardar();render();aviso('Marca el largo del muro con una línea de esquina a esquina')}catch(e){aviso('No se pudo leer la foto')}};
+$('fFoto').onchange=async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;try{const img=await comprime(f);const w=M();w.foto={img,marcas:w.foto?w.foto.marcas:[]};herr='lineal';guardar();render();aviso('Marca el largo del muro con una línea de esquina a esquina')}catch(e){aviso('No se pudo leer la foto')}};
 $('fFotos').onchange=async ev=>{const es=E();for(const f of ev.target.files){try{es.fotos.push({img:await comprime(f,1280)})}catch(e){}}ev.target.value='';guardar();render()};
 $('fCargar').onchange=async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;try{const d=JSON.parse(await f.text());if(d.formato!=='NODO-ESPACIO'||d.version!==2)throw 0;P=d.fuente||d;guardar();V={v:'inicio'};render();aviso('Levantamiento cargado')}catch(e){aviso('Ese archivo no es un levantamiento de esta versión')}};
 
