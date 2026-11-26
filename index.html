@@ -191,7 +191,7 @@ async function enviar(){
   const nom=(P.proyecto||'levantamiento').trim().replace(/[^\w\- ]+/g,'').replace(/\s+/g,'_')+'_'+P.fecha.replace(/\//g,'-')+'.espacio';
   const data=JSON.stringify(exportar());
   // 1) fuera de Claude (navegador del teléfono): compartir directo a WhatsApp
-  try{const f=new File([data],nom,{type:'application/json'});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:nom});return}}catch(e){if(e&&e.name==='AbortError')return}
+  try{const f=new File([data],nom,{type:'application/octet-stream'});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f]});aviso('Si WhatsApp solo recibió el nombre, elige «Guardar en Archivos» y compártelo desde ahí.');return}}catch(e){if(e&&e.name==='AbortError')return}
   // 2) dentro de Claude: guardar con la capacidad de descargas
   if(dl){try{await dl.save({filename:nom,data});aviso('Guardado: '+nom+'. Compártelo por WhatsApp como documento.');return}catch(e){}}
   // 3) navegador sin compartir: descarga normal
