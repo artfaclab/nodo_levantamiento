@@ -56,7 +56,7 @@ button.p{background:var(--ink);color:var(--pn)}button.a{background:var(--ac);bor
 const KEY='nodo_levantamiento_v2';
 const hoy=()=>new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'});
 const nuevo=()=>({formato:'NODO-ESPACIO',version:2,unidades:'mm',proyecto:'',cliente:'',usuario:'',fecha:hoy(),espacios:[]});
-let P=nuevo(),V={v:'inicio',e:-1,m:-1},sel=-1,herr='sel',dl=null,av=false;
+let P=nuevo(),V={v:'inicio',e:-1,m:0},sel=-1,herr='sel',dl=null;
 try{const s=localStorage.getItem(KEY);if(s)P=JSON.parse(s)}catch(e){}
 const guardar=()=>{try{localStorage.setItem(KEY,JSON.stringify(P))}catch(e){aviso('El teléfono ya no tiene espacio para guardar más fotos: envía el levantamiento.')}};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -110,11 +110,11 @@ function dibujaPlanta(svg,es,act){
     ${w.largo?`<text x="${mx}" y="${my+30}" text-anchor="middle" font-size="12" fill="var(--mut)">${cm(w.largo)}</text>`:''}</g>`});
   pts.forEach((p,i)=>{if(es.cerrado&&i===pts.length-1)return;g+=`<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="4" fill="var(--ink)"/><text x="${X(p[0])+7}" y="${Y(p[1])-7}" font-size="11" font-weight="700" fill="var(--ok)">${LET(i)}</text>`});
   svg.innerHTML=g;
-  svg.querySelectorAll('[data-m]').forEach(n=>n.onclick=()=>{V={v:'muro',e:V.e,m:+n.dataset.m};sel=-1;HIST=[];render()});
+  svg.querySelectorAll('[data-m]').forEach(n=>n.onclick=()=>{V.m=+n.dataset.m;sel=-1;herr='sel';HIST=[];render(true);const q=$('mu'+n.dataset.m);if(q)q.scrollIntoView({block:'start'})});
 }
 
 /* ---------- vistas ---------- */
-function render(){$('hd').textContent=P.proyecto||'Levantamiento';({inicio,espacio,muro}[V.v])();window.scrollTo(0,0)}
+function render(keep){const y=window.scrollY;$('hd').textContent=P.proyecto||'Levantamiento';({inicio,espacio}[V.v]||inicio)();window.scrollTo(0,keep?y:0)}
 function inicio(){
   $('app').innerHTML=`
   <div class="pn"><div class="g2"><div><label for="pUs">Técnico</label><input id="pUs" value="${esc(P.usuario)}"></div><div><label for="pFe">Fecha</label><input id="pFe" value="${esc(P.fecha)}"></div></div>
@@ -124,136 +124,134 @@ function inicio(){
   <button class="s" id="bNE" style="width:100%">+ Agregar espacio</button>
   <details class="pn" style="margin-top:12px"><summary>Más opciones</summary><div class="row" style="margin-top:10px"><button class="s" id="bNP">Nuevo proyecto</button><button class="s" id="bCargar">Cargar levantamiento</button></div></details>`;
   [['pUs','usuario'],['pFe','fecha'],['pPr','proyecto'],['pCl','cliente']].forEach(([id,k])=>$(id).oninput=ev=>{P[k]=ev.target.value;guardar()});
-  document.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{V={v:'espacio',e:+b.dataset.e,m:-1};render()});
-  $('bNE').onclick=()=>{P.espacios.push({nombre:'ESPACIO '+String(P.espacios.length+1).padStart(2,'0'),altura:2400,espesor:150,cerrado:false,muros:[],fotos:[]});guardar();V={v:'espacio',e:P.espacios.length-1,m:-1};render()};
+  document.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{V={v:'espacio',e:+b.dataset.e,m:0};sel=-1;herr='sel';HIST=[];render()});
+  $('bNE').onclick=()=>{P.espacios.push({nombre:'ESPACIO '+String(P.espacios.length+1).padStart(2,'0'),altura:2400,espesor:150,cerrado:false,muros:[nuevoMuro()],fotos:[]});guardar();V={v:'espacio',e:P.espacios.length-1,m:0};sel=-1;herr='sel';HIST=[];render()};
   $('bNP').onclick=ev=>{const b=ev.target;if(b.dataset.c){P=nuevo();guardar();render()}else{b.dataset.c=1;b.textContent='Toca otra vez para borrar todo'}};
   $('bCargar').onclick=()=>$('fCargar').click();
   $('bar').innerHTML=`<button class="a" id="bEnv">Enviar</button>`;$('bEnv').onclick=enviar;
 }
+const nuevoMuro=()=>({largo:null,altura:null,zoclo:0,esquina:'rincon',angulo:90,foto:null});
+function muroHtml(es,w,i){
+  const n=es.muros.length,act=i===V.m,f=w.foto,ult=i===n-1,der=w.esquina!=='saliente';
+  return`<section class="pn" id="mu${i}" style="${act?'border-color:var(--ac);border-width:2px':''}">
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0">Muro ${i+1}</h2><span class="${w.largo?'okt':'warn'}">${w.largo?'ancho '+cm(w.largo)+' cm':'falta el ancho'}</span></div>
+  ${f?`<div class="foto" style="margin-top:8px"><canvas id="cv${i}" data-w="${i}"></canvas></div>
+   <div class="tools" style="grid-template-columns:repeat(3,minmax(0,1fr))">${Object.entries(HERR).map(([k,h])=>`<button class="${act&&herr===k?'on':'s'}" data-h="${k}" data-w="${i}">${h.n}</button>`).join('')}<button class="s" data-des="${i}" ${act&&HIST.length?'':'disabled'}>↶ Deshacer</button></div>
+   ${act?`<p class="hint">${herr==='sel'?'Elige qué vas a marcar, o toca una marca para ver sus medidas.':HERR[herr].h}</p>`:''}`
+   :`<button class="vacio" data-tf="${i}" style="width:100%;margin-top:8px"><div><b style="font-size:18px">Tomar foto del muro ${i+1}</b><br><span class="hint">Párate frente al muro, de preferencia con el teléfono horizontal</span></div></button>`}
+  <div id="ed${i}"></div>
+  <div class="g3"><div><label for="wL${i}">Ancho (cm)</label><input id="wL${i}" data-w="${i}" data-k="largo" inputmode="decimal" value="${cm(w.largo)}"></div>
+   <div><label for="wA${i}">Alto (cm)</label><input id="wA${i}" data-w="${i}" data-k="altura" inputmode="decimal" placeholder="${cm(es.altura)}" value="${cm(w.altura)}"></div>
+   <div><label for="wZ${i}">Zoclo (cm)</label><input id="wZ${i}" data-w="${i}" data-k="zoclo" inputmode="decimal" placeholder="sin" value="${w.zoclo?cm(w.zoclo):''}"></div></div>
+  <p class="hint" style="margin-top:10px">${ult?`¿Sigue otro muro? ¿Hacia dónde giras para verlo de frente?`:`Para ver el muro ${i+2} giras hacia:`}</p>
+  <div class="row"><button class="${!ult&&!der?'p':'s'}" data-gir="izq" data-w="${i}" style="flex:1">← ${ult?'Nuevo muro':'Izquierda'}</button><button class="${!ult&&der?'p':'s'}" data-gir="der" data-w="${i}" style="flex:1">${ult?'Nuevo muro':'Derecha'} →</button></div>
+  <div class="row" style="margin-top:8px;justify-content:flex-end">${f?`<button class="s" data-tf="${i}">Otra foto</button>`:''}<button class="s" data-bm="${i}">Borrar muro</button></div>
+  </section>`}
 function espacio(){
-  const es=E(),pl=planta(es);
+  const es=E(),pl=planta(es),n=es.muros.length;if(V.m>=n)V.m=Math.max(0,n-1);
   $('app').innerHTML=`
   <div class="row" style="justify-content:space-between;margin-bottom:8px"><input id="eNom" value="${esc(es.nombre)}" style="flex:1;font-weight:700"><button class="s" id="bBE">Borrar</button></div>
-  <div class="plan"><svg id="pl"></svg></div>
-  <p class="hint">Empieza por el muro de la entrada y recorre el cuarto siempre hacia tu derecha. Al terminar cada muro, la flecha indica hacia dónde giras para ver el siguiente. Toca un muro para medirlo.</p>
-  ${es.muros.length?`<p class="${pl.falt?'warn':'okt'}">${pl.falt?`Faltan ${pl.falt} largo(s) por medir.`:es.cerrado&&pl.cierre>20?`Nota: la planta no cierra por ${cm(pl.cierre)} cm.`:'Muros medidos.'}</p>`:''}
-  ${es.muros.map((w,i)=>`<button class="lst" data-m="${i}"><b>Muro ${i+1}</b><span class="${w.largo?'ok':'x'}">${w.largo?cm(w.largo)+' cm':'sin largo'}${w.foto?' · foto':''}${w.foto&&w.foto.marcas.length?' · '+w.foto.marcas.length+' marcas':''}</span></button>`).join('')}
-  <button class="p" id="bNM" style="width:100%">+ Agregar muro ${es.muros.length+1}</button>
-  <div class="pn" style="margin-top:12px"><div class="g2"><div><label for="eAl">Altura del cuarto (cm)</label><input id="eAl" inputmode="decimal" value="${cm(es.altura)}"></div><div><label for="eEs">Espesor de muro (cm)</label><input id="eEs" inputmode="decimal" value="${cm(es.espesor)}"></div></div>
+  <div class="plan" style="height:min(32vh,240px)"><svg id="pl"></svg></div>
+  <p class="hint">Empieza por el muro de la entrada y recorre el cuarto siempre hacia tu derecha. La planta se arma sola.</p>
+  ${n&&es.cerrado&&!pl.falt&&pl.cierre>20?`<p class="warn">Nota: la planta no cierra por ${cm(pl.cierre)} cm.</p>`:''}
+  ${es.muros.map((w,i)=>muroHtml(es,w,i)).join('')}
+  ${n?'':`<button class="p" id="bNM" style="width:100%">+ Muro 1</button>`}
+  <div class="pn"><div class="g2"><div><label for="eAl">Alto del cuarto (cm)</label><input id="eAl" inputmode="decimal" value="${cm(es.altura)}"></div><div><label for="eEs">Espesor de muro (cm)</label><input id="eEs" inputmode="decimal" value="${cm(es.espesor)}"></div></div>
    <label style="display:flex;gap:10px;align-items:center;margin-top:10px;font-size:15px;color:var(--ink)"><input type="checkbox" id="eCe" ${es.cerrado?'checked':''} style="width:24px;min-height:24px"> El último muro cierra con el muro 1 (cuarto completo)</label></div>
   <div class="pn"><b>Fotos generales del espacio</b><div class="thumbs">${es.fotos.map((f,i)=>`<div><img src="${f.img}" alt="Foto ${i+1}"><button data-bf="${i}">×</button></div>`).join('')}</div><button class="s" id="bFG" style="margin-top:8px">+ Fotos</button></div>`;
-  dibujaPlanta($('pl'),es,-1);
+  dibujaPlanta($('pl'),es,V.m);
+  es.muros.forEach((w,i)=>{if(w.foto)preparaFoto(i)});
+  editor();
   $('eNom').oninput=ev=>{es.nombre=ev.target.value;guardar()};
   $('bBE').onclick=ev=>{const b=ev.target;if(b.dataset.c){P.espacios.splice(V.e,1);guardar();V={v:'inicio'};render()}else{b.dataset.c=1;b.textContent='¿Seguro?'}};
-  document.querySelectorAll('button[data-m]').forEach(b=>b.onclick=()=>{V={v:'muro',e:V.e,m:+b.dataset.m};sel=-1;HIST=[];render()});
-  $('bNM').onclick=()=>{es.muros.push({largo:null,altura:null,zoclo:0,esquina:'rincon',angulo:90,foto:null});guardar();V={v:'muro',e:V.e,m:es.muros.length-1};sel=-1;render()};
-  $('eAl').onchange=ev=>{es.altura=mm(ev.target.value)||es.altura;guardar()};$('eEs').onchange=ev=>{es.espesor=mm(ev.target.value)||es.espesor;guardar()};
-  $('eCe').onchange=ev=>{es.cerrado=ev.target.checked;guardar();render()};
+  if($('bNM'))$('bNM').onclick=()=>{es.muros.push(nuevoMuro());V.m=0;guardar();render(true)};
+  const activa=i=>{if(V.m!==i){V.m=i;sel=-1;herr='sel';HIST=[]}};
+  document.querySelectorAll('input[data-k]').forEach(inp=>inp.onchange=ev=>{const i=+inp.dataset.w,w=es.muros[i],v=mm(ev.target.value);w[inp.dataset.k]=inp.dataset.k==='zoclo'?(v||0):v;activa(i);guardar();render(true)});
+  document.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>{const i=+b.dataset.w;activa(i);herr=herr===b.dataset.h?'sel':b.dataset.h;render(true)});
+  document.querySelectorAll('[data-des]').forEach(b=>b.onclick=()=>{const i=+b.dataset.des;if(V.m!==i||!HIST.length)return;es.muros[i].foto.marcas=JSON.parse(HIST.pop());sel=-1;guardar();render(true)});
+  document.querySelectorAll('[data-tf]').forEach(b=>b.onclick=()=>{activa(+b.dataset.tf);$('fFoto').click()});
+  document.querySelectorAll('[data-gir]').forEach(b=>b.onclick=()=>{const i=+b.dataset.w;es.muros[i].esquina=b.dataset.gir==='der'?'rincon':'saliente';
+    if(i===es.muros.length-1)es.muros.push(nuevoMuro());activa(i+1);guardar();render(true);const s=$('mu'+(i+1));if(s)s.scrollIntoView({behavior:'smooth',block:'start'})});
+  document.querySelectorAll('[data-bm]').forEach(b=>b.onclick=()=>{if(b.dataset.c){es.muros.splice(+b.dataset.bm,1);V.m=0;sel=-1;HIST=[];guardar();render(true)}else{b.dataset.c=1;b.textContent='¿Seguro?'}});
+  $('eAl').onchange=ev=>{es.altura=mm(ev.target.value)||es.altura;guardar();render(true)};$('eEs').onchange=ev=>{es.espesor=mm(ev.target.value)||es.espesor;guardar()};
+  $('eCe').onchange=ev=>{es.cerrado=ev.target.checked;guardar();render(true)};
   $('bFG').onclick=()=>$('fFotos').click();
-  document.querySelectorAll('[data-bf]').forEach(b=>b.onclick=()=>{es.fotos.splice(+b.dataset.bf,1);guardar();render()});
-  $('bar').innerHTML=`<button class="s" id="bAt">‹ Espacios</button>`;$('bAt').onclick=()=>{V={v:'inicio'};render()};
-}
-function muro(){
-  const es=E(),w=M(),i=V.m,n=es.muros.length,f=w.foto;
-  $('app').innerHTML=`
-  <h2>Muro ${i+1} <small style="font-size:15px;color:var(--mut);font-weight:400">de ${n} · ${esc(es.nombre)}</small></h2>
-  ${f?`<div class="foto" id="fw"><canvas id="cv"></canvas></div>
-   <div class="tools" style="grid-template-columns:repeat(3,minmax(0,1fr))">${Object.entries(HERR).map(([k,h])=>`<button class="${herr===k?'on':'s'}" data-h="${k}">${h.n}</button>`).join('')}<button class="s" id="bDes" ${HIST.length?'':'disabled'}>↶ Deshacer</button></div>
-   <p class="hint">${herr==='sel'?'Elige qué vas a marcar, o toca una marca para ver sus medidas.':HERR[herr].h}</p>`
-   :`<button class="vacio" id="bTF" style="width:100%"><div><b style="font-size:18px">Tomar foto del muro ${i+1}</b><br><span class="hint">Párate frente al muro, de preferencia con el teléfono horizontal</span></div></button>`}
-  <div id="ed"></div>
-  <div class="pn"><div class="g3"><div><label for="wL">Largo (cm)</label><input id="wL" inputmode="decimal" value="${cm(w.largo)}"></div>
-   <div><label for="wA">Altura (cm)</label><input id="wA" inputmode="decimal" placeholder="${cm(es.altura)}" value="${cm(w.altura)}"></div>
-   <div><label for="wZ">Zoclo (cm)</label><input id="wZ" inputmode="decimal" placeholder="sin" value="${w.zoclo?cm(w.zoclo):''}"></div></div>
-   <p class="hint">Para pasar al muro ${i+2}: ¿hacia dónde giras para verlo de frente? Usa la flecha de abajo.</p>
-   ${av?`<label for="wG">Ángulo de la esquina (°)</label><input id="wG" inputmode="decimal" value="${w.angulo||90}">`:''}
-   <div class="row" style="margin-top:10px"><button class="s" id="bVP">Vista planta</button>${f?'<button class="s" id="bOF">Otra foto</button>':''}<button class="s" id="bAv">${av?'Ocultar ángulo':'Ángulo distinto a 90°'}</button><button class="s" id="bBM">Borrar muro</button></div></div>
-  <div class="plan hid" id="vp"><svg id="pl"></svg></div>`;
-  if(f)preparaFoto();
-  editor();
-  const num=(id,fn)=>$(id).onchange=ev=>{fn(mm(ev.target.value));guardar();if(f)pinta()};
-  num('wL',v=>w.largo=v);num('wA',v=>w.altura=v);num('wZ',v=>w.zoclo=v||0);
-  if(av)$('wG').onchange=ev=>{const a=parseFloat(ev.target.value);w.angulo=isFinite(a)&&a>0&&a<180?a:90;guardar();dibujaPlanta($('pl'),es,i)};
-  $('bAv').onclick=()=>{av=!av;render()};
-  $('bVP').onclick=()=>{$('vp').classList.toggle('hid');dibujaPlanta($('pl'),es,i)};
-  $('bBM').onclick=ev=>{const b=ev.target;if(b.dataset.c){es.muros.splice(i,1);guardar();V={v:'espacio',e:V.e};render()}else{b.dataset.c=1;b.textContent='¿Seguro?'}};
-  if($('bTF'))$('bTF').onclick=()=>$('fFoto').click();if($('bOF'))$('bOF').onclick=()=>$('fFoto').click();
-  document.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>{herr=herr===b.dataset.h?'sel':b.dataset.h;render()});
-  if($('bDes'))$('bDes').onclick=()=>{const f=M().foto;if(!HIST.length||!f)return;f.marcas=JSON.parse(HIST.pop());sel=-1;guardar();render()};
-  const sig=i+2,der=w.esquina!=='saliente',hay=i<n-1;
-  $('bar').innerHTML=`<button class="s" id="bEs" title="Espacio">☰</button><button class="s" id="bAn" ${i==0?'disabled':''}>‹ Anterior</button><button class="${hay&&!der?'p':'s'}" id="bIz">← Muro ${sig}</button><button class="${hay&&der?'p':'s'}" id="bDe">Muro ${sig} →</button>`;
-  $('bEs').onclick=()=>{V={v:'espacio',e:V.e};render()};$('bAn').onclick=()=>{V.m--;sel=-1;HIST=[];render()};
-  const ir=lado=>{w.esquina=lado==='der'?'rincon':'saliente';if(!hay)es.muros.push({largo:null,altura:null,zoclo:0,esquina:'rincon',angulo:90,foto:null});V.m++;sel=-1;herr='sel';HIST=[];guardar();render()};
-  $('bIz').onclick=()=>ir('izq');$('bDe').onclick=()=>ir('der');
+  document.querySelectorAll('[data-bf]').forEach(b=>b.onclick=()=>{es.fotos.splice(+b.dataset.bf,1);guardar();render(true)});
+  $('pl').querySelectorAll('[data-m]').forEach(g=>g.onclick=()=>{activa(+g.dataset.m);render(true);const s=$('mu'+g.dataset.m);if(s)s.scrollIntoView({behavior:'smooth',block:'start'})});
+  $('bar').innerHTML=`<button class="s" id="bAt">‹ Espacios</button><button class="a" id="bEnv2">Enviar</button>`;$('bAt').onclick=()=>{V={v:'inicio'};render()};$('bEnv2').onclick=enviar;
 }
 
 /* ---------- foto acotada ---------- */
-let IMG=null;
-function preparaFoto(){const f=M().foto;IMG=new Image();IMG.onload=()=>{pinta();eventos()};IMG.src=f.img}
-function geo(){const c=$('cv');return{c,W:c.width,H:c.height}}
-function pinta(){
-  const c=$('cv');if(!c||!IMG||!IMG.complete)return;const r=c.parentElement.clientWidth/IMG.width;
-  c.width=IMG.width;c.height=IMG.height;const x=c.getContext('2d');x.drawImage(IMG,0,0);
-  dibujaMarcas(x,M().foto.marcas,c.width,c.height,sel,1/r);
+const IMGS={};
+function preparaFoto(i){const f=E().muros[i].foto,im=new Image();IMGS[i]=im;im.onload=()=>{pinta(i);eventos(i)};im.src=f.img}
+function pinta(i=V.m){
+  const c=$('cv'+i),im=IMGS[i];if(!c||!im||!im.complete)return;
+  c.width=im.width;c.height=im.height;const x=c.getContext('2d');x.drawImage(im,0,0);
+  const w=E().muros[i];dibujaMarcas(x,w.foto.marcas,c.width,c.height,i===V.m?sel:-1,1,m=>etiquetaDe(w,m,E()));
 }
-function etiqueta(m){const t=TIPOS[m.tipo],d=m.datos||{};if(!t)return'?';
-  if(m.tipo==='muro')return'Largo '+(cm(M().largo)||'?');
-  const num=TIPOS_N(m);const lado=t.lado&&d.dist!=null?` · ${d.lado==='der'?'der':'izq'} ${cm(d.dist)}`:'';
-  const med=t.c.map(([k])=>cm(d[k])||'?').join('×');return`${num} ${med}${lado}`}
-function TIPOS_N(m){const ms=M().foto?M().foto.marcas:[];const mismos=ms.filter(q=>q.tipo===m.tipo);return TIPOS[m.tipo].n.split(' ')[0]+' '+(mismos.indexOf(m)+1)}
-function dibujaMarcas(x,marcas,W,H,s,esc1,etiq=etiqueta){
+function etiquetaDe(w,m,es){const t=TIPOS[m.tipo],d=m.datos||{};if(!t)return'?';
+  if(m.tipo==='muro')return d.eje==='v'?'Alto '+(cm(w.altura||es.altura)||'?'):'Ancho '+(cm(w.largo)||'?');
+  const k=w.foto.marcas.filter(q=>q.tipo===m.tipo).indexOf(m)+1;
+  return`${t.n.split(' ')[0]} ${k} ${t.c.map(([q])=>cm(d[q])||'?').join('×')}${t.lado&&d.dist!=null?` · ${d.lado==='der'?'der':'izq'} ${cm(d.dist)}`:''}`}
+function dibujaMarcas(x,marcas,W,H,s,esc1,etiq){
   const lw=Math.max(3,W/260),fs=Math.max(16,W/40);x.font=`700 ${fs}px sans-serif`;x.lineCap='round';
   marcas.forEach((m,i)=>{const c=COL[m.tipo]||'#fff',p=m.p.map((v,k)=>v*(k%2?H:W)),on=i===s;x.strokeStyle=c;x.fillStyle=c;x.lineWidth=on?lw*2:lw;
     let tx,ty;
     if(m.forma==='linea'){x.beginPath();x.moveTo(p[0],p[1]);x.lineTo(p[2],p[3]);x.stroke();
       const a=Math.atan2(p[3]-p[1],p[2]-p[0]),q=lw*4;[[p[0],p[1]],[p[2],p[3]]].forEach(([u,v])=>{x.beginPath();x.moveTo(u-q*Math.sin(a),v+q*Math.cos(a));x.lineTo(u+q*Math.sin(a),v-q*Math.cos(a));x.stroke()});
-      tx=(p[0]+p[2])/2;ty=(p[1]+p[3])/2-lw*3}
-    else if(m.forma==='caja'){x.strokeRect(Math.min(p[0],p[2]),Math.min(p[1],p[3]),Math.abs(p[2]-p[0]),Math.abs(p[3]-p[1]));if(on){x.globalAlpha=.18;x.fillRect(Math.min(p[0],p[2]),Math.min(p[1],p[3]),Math.abs(p[2]-p[0]),Math.abs(p[3]-p[1]));x.globalAlpha=1}tx=Math.min(p[0],p[2]);ty=Math.min(p[1],p[3])-lw*2}
+      tx=(p[0]+p[2])/2+lw*2;ty=(p[1]+p[3])/2-lw*3}
+    else if(m.forma==='caja'){const bx=Math.min(p[0],p[2]),by=Math.min(p[1],p[3]),bw=Math.abs(p[2]-p[0]),bh=Math.abs(p[3]-p[1]);x.strokeRect(bx,by,bw,bh);if(on){x.globalAlpha=.18;x.fillRect(bx,by,bw,bh);x.globalAlpha=1}tx=bx;ty=by-lw*2}
     else{x.beginPath();x.arc(p[0],p[1],lw*3.5,0,7);x.fill();tx=p[0]+lw*5;ty=p[1]+fs/3}
-    const t=etiq(m),tw=x.measureText(t).width;tx=Math.max(4,Math.min(tx,W-tw-8));ty=Math.max(fs+4,ty);
+    const t=etiq?etiq(m):'';if(!t)return;const tw=x.measureText(t).width;tx=Math.max(4,Math.min(tx,W-tw-8));ty=Math.max(fs+4,ty);
     x.fillStyle='rgba(0,0,0,.72)';x.fillRect(tx-4,ty-fs,tw+8,fs*1.25);x.fillStyle=c;x.fillText(t,tx,ty)});
 }
-function eventos(){
-  const c=$('cv');let ini=null,tmp=null;
+function eventos(i){
+  const c=$('cv'+i);if(!c)return;let ini=null,tmp=null;
   const pos=ev=>{const r=c.getBoundingClientRect();return[(ev.clientX-r.left)/r.width,(ev.clientY-r.top)/r.height]};
-  c.onpointerdown=ev=>{c.setPointerCapture(ev.pointerId);const p=pos(ev);
-    if(herr==='sel'){sel=busca(p);pinta();editor();return}
+  c.onpointerdown=ev=>{const p=pos(ev);
+    if(V.m!==i){V.m=i;sel=-1;herr='sel';HIST=[];render(true);return}
+    if(herr==='sel'){sel=busca(p);pinta(i);editor();return}
+    c.setPointerCapture(ev.pointerId);
     const H=HERR[herr];if(H.f==='punto'){agrega({forma:'punto',p:[p[0],p[1]]},H.t[0]);return}
     ini=p;tmp={forma:H.f,p:[p[0],p[1],p[0],p[1]],tipo:H.t[0]}};
-  c.onpointermove=ev=>{if(!ini)return;const p=pos(ev);tmp.p=[ini[0],ini[1],p[0],p[1]];pinta();const x=c.getContext('2d');dibujaMarcas(x,[tmp],c.width,c.height,0,1,()=>'')};
-  c.onpointerup=ev=>{if(!ini)return;const p=pos(ev),q=ini,f=tmp.forma,t=tmp.tipo;ini=null;tmp=null;if(Math.hypot(p[0]-q[0],p[1]-q[1])<.03){pinta();return}agrega({forma:f,p:[q[0],q[1],p[0],p[1]]},t)};
+  c.onpointermove=ev=>{if(!ini)return;const p=pos(ev);tmp.p=[ini[0],ini[1],p[0],p[1]];pinta(i);dibujaMarcas(c.getContext('2d'),[tmp],c.width,c.height,0,1,null)};
+  c.onpointerup=ev=>{if(!ini)return;const p=pos(ev),q=ini,f=tmp.forma,t=tmp.tipo;ini=null;tmp=null;if(Math.hypot(p[0]-q[0],p[1]-q[1])<.03){pinta(i);return}agrega({forma:f,p:[q[0],q[1],p[0],p[1]]},t)};
 }
 function busca(p){const ms=M().foto.marcas;let best=-1,bd=.06;
   ms.forEach((m,i)=>{let d;if(m.forma==='punto')d=Math.hypot(p[0]-m.p[0],p[1]-m.p[1]);
     else if(m.forma==='caja'){const [a,b,c2,d2]=m.p,inx=p[0]>=Math.min(a,c2)&&p[0]<=Math.max(a,c2),iny=p[1]>=Math.min(b,d2)&&p[1]<=Math.max(b,d2);d=inx&&iny?.02:1}
     else{const [x1,y1,x2,y2]=m.p,L=Math.hypot(x2-x1,y2-y1)||1e-6,t=Math.max(0,Math.min(1,((p[0]-x1)*(x2-x1)+(p[1]-y1)*(y2-y1))/L/L));d=Math.hypot(p[0]-(x1+t*(x2-x1)),p[1]-(y1+t*(y2-y1)))}
     if(d<bd){bd=d;best=i}});return best}
-function agrega(m,tipo){snap();tipo=tipo||DE_FORMA[m.forma][0];const t=TIPOS[tipo];m.tipo=tipo;m.datos=Object.assign({lado:'izq',dist:null},t.def||{});
-  const ms=M().foto.marcas;ms.push(m);sel=ms.length-1;herr='sel';guardar();render()}
+function agrega(m,tipo){snap();const t=TIPOS[tipo];m.tipo=tipo;m.datos=Object.assign({lado:'izq',dist:null},t.def||{});
+  if(m.forma==='linea'){const im=IMGS[V.m]||{width:1,height:1},dx=(m.p[2]-m.p[0])*im.width,dy=(m.p[3]-m.p[1])*im.height;m.datos={eje:Math.abs(dx)>=Math.abs(dy)?'h':'v'}}
+  const ms=M().foto.marcas;ms.push(m);sel=ms.length-1;herr='sel';guardar();render(true)}
 function editor(){
-  const ed=$('ed');if(!ed)return;const w=M(),f=w.foto;if(!f||sel<0||!f.marcas[sel]){ed.innerHTML=f&&f.marcas.length?`<p class="hint">${f.marcas.length} marca(s). Elige una para revisar sus medidas.</p>`:'';return}
+  const ed=$('ed'+V.m);if(!ed)return;const es=E(),w=M(),f=w.foto;if(!f||sel<0||!f.marcas[sel]){ed.innerHTML='';return}
   const m=f.marcas[sel],t=TIPOS[m.tipo],d=m.datos;
-  ed.innerHTML=`<div class="pn"><div class="g2"><div><label for="mT">Qué es</label><select id="mT">${(OPC[m.tipo]||[m.tipo]).map(k=>`<option value="${k}" ${k===m.tipo?'selected':''}>${TIPOS[k].n}</option>`).join('')}</select></div>
-    ${t.lado?`<div><label for="mL">Esquina más cercana</label><select id="mL"><option value="izq" ${d.lado!=='der'?'selected':''}>Izquierda</option><option value="der" ${d.lado==='der'?'selected':''}>Derecha</option></select></div>`:'<div></div>'}</div>
-    <div class="g3">${m.tipo==='muro'?`<div><label for="mV_largo">Largo (cm)</label><input id="mV_largo" inputmode="decimal" value="${cm(w.largo)}"></div>`:
-      (t.lado?`<div><label for="mV_dist">Distancia a esa esquina</label><input id="mV_dist" inputmode="decimal" value="${cm(d.dist)}"></div>`:'')+t.c.map(([k,l])=>`<div><label for="mV_${k}">${l}</label><input id="mV_${k}" inputmode="decimal" value="${cm(d[k])}"></div>`).join('')}</div>
+  let campos;
+  if(m.tipo==='muro'){const k=d.eje==='v'?'altura':'largo';campos=`<div><label for="mV_${k}">${d.eje==='v'?'Alto del muro':'Ancho del muro'} (cm)</label><input id="mV_${k}" inputmode="decimal" value="${cm(w[k])}"></div>`}
+  else campos=(t.lado?`<div><label for="mV_dist">Distancia a esa esquina</label><input id="mV_dist" inputmode="decimal" value="${cm(d.dist)}"></div>`:'')+t.c.map(([k,l])=>`<div><label for="mV_${k}">${l}</label><input id="mV_${k}" inputmode="decimal" value="${cm(d[k])}"></div>`).join('');
+  ed.innerHTML=`<div class="pn" style="background:var(--bg)"><div class="g2"><div><label for="mT">Qué es</label><select id="mT">${(OPC[m.tipo]||[m.tipo]).map(k=>`<option value="${k}" ${k===m.tipo?'selected':''}>${TIPOS[k].n}</option>`).join('')}</select></div>
+    ${t.lado?`<div><label for="mL">Esquina más cercana</label><select id="mL"><option value="izq" ${d.lado!=='der'?'selected':''}>Izquierda</option><option value="der" ${d.lado==='der'?'selected':''}>Derecha</option></select></div>`:m.tipo==='muro'?`<div><label for="mE">Medida</label><select id="mE"><option value="h" ${d.eje!=='v'?'selected':''}>Horizontal (ancho)</option><option value="v" ${d.eje==='v'?'selected':''}>Vertical (alto)</option></select></div>`:'<div></div>'}</div>
+    <div class="g3">${campos}</div>
     <div class="row" style="margin-top:10px;justify-content:space-between"><span class="hint">Medidas en cm</span><button class="s" id="mX">Borrar marca</button></div></div>`;
   $('mT').onchange=ev=>{snap();m.tipo=ev.target.value;m.datos=Object.assign({lado:d.lado||'izq',dist:d.dist??null},TIPOS[m.tipo].def||{});guardar();pinta();editor()};
   if($('mL'))$('mL').onchange=ev=>{snap();d.lado=ev.target.value;guardar();pinta()};
-  ed.querySelectorAll('input[id^="mV_"]').forEach(inp=>inp.onchange=ev=>{snap();const k=inp.id.slice(3),v=mm(ev.target.value);if(k==='largo'){w.largo=v;$('wL').value=cm(v)}else d[k]=v;guardar();pinta()});
-  $('mX').onclick=()=>{snap();f.marcas.splice(sel,1);sel=-1;guardar();render()};
+  if($('mE'))$('mE').onchange=ev=>{snap();d.eje=ev.target.value;guardar();pinta();editor()};
+  ed.querySelectorAll('input[id^="mV_"]').forEach(inp=>inp.onchange=ev=>{snap();const k=inp.id.slice(3),v=mm(ev.target.value);if(k==='largo'||k==='altura')w[k]=v;else d[k]=v;guardar();render(true)});
+  $('mX').onclick=()=>{snap();f.marcas.splice(sel,1);sel=-1;guardar();render(true)};
 }
 
 /* ---------- fotos ---------- */
 function comprime(file,max=1600){return new Promise((ok,mal)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{const r=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*r);c.height=Math.round(im.height*r);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL('image/jpeg',.72))};im.onerror=mal;im.src=u})}
-$('fFoto').onchange=async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;try{const img=await comprime(f);const w=M();w.foto={img,marcas:w.foto?w.foto.marcas:[]};herr='lineal';guardar();render();aviso('Marca el largo del muro con una línea de esquina a esquina')}catch(e){aviso('No se pudo leer la foto')}};
-$('fFotos').onchange=async ev=>{const es=E();for(const f of ev.target.files){try{es.fotos.push({img:await comprime(f,1280)})}catch(e){}}ev.target.value='';guardar();render()};
+$('fFoto').onchange=async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;try{const img=await comprime(f);const w=M();w.foto={img,marcas:w.foto?w.foto.marcas:[]};herr='lineal';guardar();render(true);aviso('Marca el ancho del muro con una línea de esquina a esquina')}catch(e){aviso('No se pudo leer la foto')}};
+$('fFotos').onchange=async ev=>{const es=E();for(const f of ev.target.files){try{es.fotos.push({img:await comprime(f,1280)})}catch(e){}}ev.target.value='';guardar();render(true)};
 $('fCargar').onchange=async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;try{const d=JSON.parse(await f.text());if(d.formato!=='NODO-ESPACIO'||d.version!==2)throw 0;P=d.fuente||d;guardar();V={v:'inicio'};render();aviso('Levantamiento cargado')}catch(e){aviso('Ese archivo no es un levantamiento de esta versión')}};
 
 /* ---------- salida: archivo para NODO y PDF ---------- */
 async function exportar(){
   const out={formato:'NODO-ESPACIO',version:2,unidades:'mm',proyecto:P.proyecto,cliente:P.cliente,usuario:P.usuario,fecha:P.fecha,generado:new Date().toISOString(),espacios:[]};
-  for(const es of P.espacios){const pl=planta(es),cer=es.cerrado&&es.muros.length>2;const acot=[];for(let i=0;i<es.muros.length;i++){const w=es.muros[i];if(w.foto)acot.push({muro:i+1,img:await fotoAcotada(w)})}
+  for(const es of P.espacios){const pl=planta(es),cer=es.cerrado&&es.muros.length>2;const acot=[];for(let i=0;i<es.muros.length;i++){const w=es.muros[i];if(w.foto)acot.push({muro:i+1,img:await fotoAcotada(w,es)})}
     const vert=(cer?pl.pts.slice(0,-1):pl.pts).map(p=>[Math.round(p[0]),Math.round(-p[1])]);   // Y hacia abajo, como lo lee NODO
     out.espacios.push({nombre:es.nombre,altura:es.altura,espesor:es.espesor,abierta:!cer,cierre:cer?pl.cierre:null,vertices:vert,
       muros:es.muros.map((w,i)=>({n:i+1,largo:w.largo,altura:w.altura||es.altura,espesor:es.espesor,zoclo:w.zoclo||0,esquina:w.esquina,angulo:w.angulo||90,
@@ -262,8 +260,8 @@ async function exportar(){
           const o={tipo:m.tipo,lado:d.lado,dist:d.dist,x};t.c.forEach(([k])=>o[k]=d[k]??null);return o})})),
       fotos:[...acot,...es.fotos.map(f=>({muro:null,img:f.img}))]})}
   return out}
-async function fotoAcotada(w){const im=new Image();await new Promise(r=>{im.onload=r;im.onerror=r;im.src=w.foto.img});const c=document.createElement('canvas');c.width=im.width||1600;c.height=im.height||1200;const x=c.getContext('2d');try{x.drawImage(im,0,0)}catch(e){}
-  dibujaMarcas(x,w.foto.marcas,c.width,c.height,-1,1,m=>{const d=m.datos||{},t=TIPOS[m.tipo];if(m.tipo==='muro')return'Largo '+(cm(w.largo)||'?');const k=w.foto.marcas.filter(q=>q.tipo===m.tipo).indexOf(m)+1;return`${t.n.split(' ')[0]} ${k} ${t.c.map(([q])=>cm(d[q])||'?').join('×')}${t.lado&&d.dist!=null?` · ${d.lado==='der'?'der':'izq'} ${cm(d.dist)}`:''}`});
+async function fotoAcotada(w,es){const im=new Image();await new Promise(r=>{im.onload=r;im.onerror=r;im.src=w.foto.img});const c=document.createElement('canvas');c.width=im.width||1600;c.height=im.height||1200;const x=c.getContext('2d');try{x.drawImage(im,0,0)}catch(e){}
+  dibujaMarcas(x,w.foto.marcas,c.width,c.height,-1,1,m=>etiquetaDe(w,m,es));
   return c.toDataURL('image/jpeg',.8)}
 function pdf(out){
   if(!window.jspdf)return null;const doc=new window.jspdf.jsPDF({unit:'mm',format:'letter'}),W=216,H=279,mg=16;let y;
@@ -276,7 +274,7 @@ function pdf(out){
     const k=Math.min(bx[2]/Math.max(Math.max(...xs)-Math.min(...xs),1),bx[3]/Math.max(Math.max(...ys)-Math.min(...ys),1))*.85,ox=bx[0]+(bx[2]-(Math.max(...xs)-Math.min(...xs))*k)/2-Math.min(...xs)*k,oy=bx[1]+(bx[3]-(Math.max(...ys)-Math.min(...ys))*k)/2-Math.min(...ys)*k;
     doc.setLineWidth(.8);src.muros.forEach((w,i)=>{const a=pts[i],b=pts[i+1];doc.line(ox+a[0]*k,oy+a[1]*k,ox+b[0]*k,oy+b[1]*k);txt(`${i+1}: ${cm(w.largo)||'?'}`,ox+(a[0]+b[0])/2*k+2,oy+(a[1]+b[1])/2*k-2,9,true)});
     pts.forEach((p,i)=>{if(!(src.cerrado&&i===pts.length-1))txt(LET(i),ox+p[0]*k+1.5,oy+p[1]*k-1.5,8)});
-    y=170;es.muros.forEach(w=>{if(y>H-20){doc.addPage();y=22}txt(`Muro ${w.n}: largo ${cm(w.largo)||'?'} · altura ${cm(w.altura)}${w.zoclo?` · zoclo ${cm(w.zoclo)}`:''} · ${w.esquina==='saliente'?'esquina saliente':'rincón'}${w.angulo!==90?` ${w.angulo}°`:''}`,mg,y,10,true);y+=6;
+    y=170;es.muros.forEach(w=>{if(y>H-20){doc.addPage();y=22}txt(`Muro ${w.n}: ancho ${cm(w.largo)||'?'} · alto ${cm(w.altura)}${w.zoclo?` · zoclo ${cm(w.zoclo)}`:''} · ${w.esquina==='saliente'?'gira a la izquierda':'gira a la derecha'}`,mg,y,10,true);y+=6;
       w.elementos.forEach(e=>{const t=TIPOS[e.tipo];txt(`   ${t.n}: ${t.c.map(([k2,l])=>`${l.split(' (')[0].toLowerCase()} ${cm(e[k2])||'?'}`).join(', ')}${e.dist!=null?`, a ${cm(e.dist)} de la esquina ${e.lado==='der'?'derecha':'izquierda'}`:''}`,mg,y,9);y+=5});y+=2});
     es.fotos.forEach(f=>{doc.addPage();txt(`${es.nombre} · ${f.muro?'Muro '+f.muro:'Foto general'}`,mg,20,13,true);const pr=doc.getImageProperties(f.img),mw=W-2*mg,mh=H-50,r=Math.min(mw/pr.width,mh/pr.height);doc.addImage(f.img,'JPEG',mg,28,pr.width*r,pr.height*r)})});
   txt('NODO · dev.rk',mg,H-8,8);return doc.output('blob')}
