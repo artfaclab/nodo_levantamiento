@@ -75,8 +75,33 @@ function real(es){
   let x=0,y=0;const v=[[0,0]];let falt=0;
   ms.forEach((m,i)=>{const L=(es.muros[i]&&es.muros[i].largo)||(falt++,dl[i]*k);const ux=(m.b[0]-m.a[0])/dl[i],uy=(m.b[1]-m.a[1])/dl[i];x+=ux*L;y+=uy*L;v.push([x,y])});
   const cierre=Math.hypot(v[v.length-1][0],v[v.length-1][1]);v.pop();
-  return{v:v.map(q=>[Math.round(q[0]),Math.round(q[1])]),cierre:Math.round(cierre),falt}
+  const dg=(es.diagonales||[]).filter(d=>d.largo&&d.a!==d.b&&d.a<v.length&&d.b<v.length);
+  if(!dg.length)return{v:v.map(q=>[Math.round(q[0]),Math.round(q[1])]),cierre:Math.round(cierre),falt,diag:0};
+  return ajusta(es,ms,v,dg,dl,k,falt)
 }
+const ang=(p,i)=>{const n=p.length,a=p[(i+n-1)%n],b=p[i],c=p[(i+1)%n];const u=[a[0]-b[0],a[1]-b[1]],w=[c[0]-b[0],c[1]-b[1]];return Math.atan2(u[0]*w[1]-u[1]*w[0],u[0]*w[0]+u[1]*w[1])};
+// mínimos cuadrados (Levenberg-Marquardt): largos y diagonales mandan; los ángulos del trazo solo guían lo que no se midió
+function ajusta(es,ms,v0,dg,dl,k,falt){
+  const n=v0.length,p=es.puntos,a0=p.map((_,i)=>ang(p,i)),d1=[(p[1][0]-p[0][0])/dl[0],(p[1][1]-p[0][1])/dl[0]];
+  const pt=(x,i)=>[x[2*i],x[2*i+1]],dist=(x,i,j)=>{const a=pt(x,i),b=pt(x,j);return Math.hypot(b[0]-a[0],b[1]-a[1])};
+  const res=x=>{const r=[],P=[...Array(n)].map((_,i)=>pt(x,i));
+    ms.forEach((m,i)=>{const L=es.muros[i]&&es.muros[i].largo;r.push(L?dist(x,i,(i+1)%n)-L:.05*(dist(x,i,(i+1)%n)-dl[i]*k))});
+    dg.forEach(d=>r.push(dist(x,d.a,d.b)-d.largo));
+    P.forEach((_,i)=>{let e=ang(P,i)-a0[i];e=Math.atan2(Math.sin(e),Math.cos(e));r.push(.02*1000*e)});
+    r.push(10*x[0],10*x[1],10*((x[2]-x[0])*-d1[1]+(x[3]-x[1])*d1[0]));return r};
+  let x=v0.flat(),lam=1e-3,r=res(x),f=r.reduce((s,q)=>s+q*q,0);
+  for(let it=0;it<80;it++){
+    const m=x.length,J=r.map(()=>new Array(m).fill(0));
+    for(let j=0;j<m;j++){const y=x.slice();y[j]+=.1;const r2=res(y);r2.forEach((q,i)=>J[i][j]=(q-r[i])/.1)}
+    const A=[...Array(m)].map((_,i)=>[...Array(m)].map((_,j)=>r.reduce((s,_,q)=>s+J[q][i]*J[q][j],0)+(i==j?lam:0))),g=[...Array(m)].map((_,i)=>-r.reduce((s,q,t)=>s+J[t][i]*q,0));
+    const d=resuelve(A,g);if(!d)break;const xn=x.map((q,i)=>q+d[i]),rn=res(xn),fn=rn.reduce((s,q)=>s+q*q,0);
+    if(fn<f){x=xn;r=rn;lam=Math.max(lam/3,1e-7);if(f-fn<1e-6){f=fn;break}f=fn}else lam*=4}
+  const P=[...Array(n)].map((_,i)=>pt(x,i));let peor=0;
+  ms.forEach((m,i)=>{const L=es.muros[i]&&es.muros[i].largo;if(L)peor=Math.max(peor,Math.abs(dist(x,i,(i+1)%n)-L))});dg.forEach(d=>peor=Math.max(peor,Math.abs(dist(x,d.a,d.b)-d.largo)));
+  return{v:P.map(q=>[Math.round(q[0]),Math.round(q[1])]),cierre:Math.round(peor),falt,diag:dg.length,angulos:P.map((_,i)=>Math.round(Math.abs(ang(P,i))*1800/Math.PI)/10)}
+}
+function resuelve(A,b){const n=b.length,M=A.map((r,i)=>[...r,b[i]]);for(let c=0;c<n;c++){let pv=c;for(let r=c+1;r<n;r++)if(Math.abs(M[r][c])>Math.abs(M[pv][c]))pv=r;if(Math.abs(M[pv][c])<1e-12)return null;[M[c],M[pv]]=[M[pv],M[c]];for(let r=0;r<n;r++){if(r==c)continue;const f=M[r][c]/M[c][c];for(let k=c;k<=n;k++)M[r][k]-=f*M[c][k]}}return M.map((r,i)=>r[n]/r[i])}
+const LET=i=>String.fromCharCode(65+i);
 
 /* ---------- vistas ---------- */
 function render(){({inicio,espacio,muro}[vista.v])();window.scrollTo(0,0)}
@@ -108,19 +133,26 @@ function espacio(){
   <div class="fig" id="fig"><svg id="sv"></svg></div>
   <div class="row" style="margin:10px 0">${es.cerrado?'<button class="s" id="bReabrir">Editar trazo</button>':`<button class="${orto?'p':'s'}" id="bOrto">${orto?'90° activado':'Libre (diagonal)'}</button><button class="s" id="bDeshacer">Deshacer</button><button class="s" id="bCerrar">Cerrar planta</button>`}</div>
   ${es.cerrado?`<div class="pn"><div class="g2"><div><label for="eAlt">Altura del espacio (cm)</label><input id="eAlt" inputmode="decimal" value="${cm(es.altura)}"></div><div><label for="eEsp">Espesor de muro (cm)</label><input id="eEsp" inputmode="decimal" value="${cm(es.espesor)}"></div></div>
-   ${R?(R.falt?`<p class="warn">Faltan ${R.falt} de ${ms.length} muros por medir.</p>`:R.cierre>20?`<p class="warn">La planta no cierra por ${cm(R.cierre)} cm: revisa los largos o el trazo.</p>`:'<p class="okt">Planta medida y cerrada.</p>'):''}</div>`:''}
+   ${R?(R.falt?`<p class="warn">Faltan ${R.falt} de ${ms.length} muros por medir.</p>`:R.cierre>20?(R.diag?`<p class="warn">Las medidas no cuadran entre sí por ${cm(R.cierre)} cm: revisa largos y diagonales.</p>`:`<p class="warn">La planta no cierra por ${cm(R.cierre)} cm. Si el cuarto no está a escuadra, mide ${Math.max(1,ms.length-3)} diagonal(es).</p>`):`<p class="okt">Planta medida y cerrada${R.diag?' con diagonales':' (esquinas a escuadra)'}.</p>`):''}
+   ${R&&R.angulos?`<p class="hint">Ángulos: ${R.angulos.map((a,i)=>LET(i)+' '+a+'°').join(' · ')}</p>`:''}</div>
+  <div class="pn"><b>Diagonales</b><p class="hint">Para cuartos fuera de escuadra: mide de esquina a esquina. Hacen falta ${Math.max(1,ms.length-3)} (muros − 3).</p>
+   ${(es.diagonales||[]).map((d,k)=>`<div class="row" style="margin-bottom:6px"><b style="width:56px">${LET(d.a)}–${LET(d.b)}</b><input data-dg="${k}" inputmode="decimal" placeholder="cm" value="${cm(d.largo)}" style="flex:1"><button class="s" data-dgx="${k}">Quitar</button></div>`).join('')}
+   <div class="row"><select id="dgA" style="width:auto">${es.puntos.map((_,i)=>`<option value="${i}">${LET(i)}</option>`).join('')}</select><select id="dgB" style="width:auto">${es.puntos.map((_,i)=>`<option value="${i}" ${i==2?'selected':''}>${LET(i)}</option>`).join('')}</select><button class="s" id="bDg">+ Diagonal</button></div></div>`:''}
   <div class="pn"><b>Fotos del espacio</b><div class="fotos">${(es.fotos||[]).map((f,i)=>`<div><img src="${f.img}" alt="Foto ${i+1}"><button data-bf="${i}">×</button></div>`).join('')}</div><div class="row" style="margin-top:8px"><button class="s" id="bFoto">+ Foto</button></div></div>`;
   dibujaPlanta();
   $('eNom').oninput=ev=>{es.nombre=ev.target.value;guardar()};
   $('bBorrarE').onclick=()=>{const b=$('bBorrarE');if(b.dataset.c){P.espacios.splice(vista.e,1);guardar();vista={v:'inicio'};render()}else{b.dataset.c=1;b.textContent='¿Seguro?'}};
   if(es.cerrado){$('bReabrir').onclick=()=>{es.cerrado=false;guardar();render()};
-    $('eAlt').onchange=ev=>{es.altura=mm(ev.target.value)||es.altura;guardar()};$('eEsp').onchange=ev=>{es.espesor=mm(ev.target.value)||es.espesor;guardar();dibujaPlanta()}}
+    $('eAlt').onchange=ev=>{es.altura=mm(ev.target.value)||es.altura;guardar()};$('eEsp').onchange=ev=>{es.espesor=mm(ev.target.value)||es.espesor;guardar();dibujaPlanta()};
+    $('bDg').onclick=()=>{const a=+$('dgA').value,b=+$('dgB').value,n=es.puntos.length;if(a==b||(a+1)%n==b||(b+1)%n==a){aviso('Elige dos esquinas que no sean del mismo muro');return}(es.diagonales=es.diagonales||[]).push({a:Math.min(a,b),b:Math.max(a,b),largo:null});guardar();render()};
+    document.querySelectorAll('[data-dg]').forEach(inp=>inp.onchange=ev=>{es.diagonales[+inp.dataset.dg].largo=mm(ev.target.value);guardar();render()});
+    document.querySelectorAll('[data-dgx]').forEach(b=>b.onclick=()=>{es.diagonales.splice(+b.dataset.dgx,1);guardar();render()})}
   else{$('bOrto').onclick=()=>{orto=!orto;render()};$('bDeshacer').onclick=()=>{es.puntos.pop();guardar();dibujaPlanta()};$('bCerrar').onclick=cerrar}
   $('bFoto').onclick=()=>{fotoMuro=null;$('fFoto').click()};
   document.querySelectorAll('[data-bf]').forEach(b=>b.onclick=()=>{es.fotos.splice(+b.dataset.bf,1);guardar();render()});
   $('bar').innerHTML=`<button class="s" id="bAtras">‹ Espacios</button>`;$('bAtras').onclick=()=>{vista={v:'inicio'};render()};
 }
-function cerrar(){const es=E();if(es.puntos.length<3){aviso('Traza al menos 3 esquinas');return}es.cerrado=true;while(es.muros.length<es.puntos.length)es.muros.push({largo:null,espesor:null,zoclo:0,elementos:[]});es.muros.length=es.puntos.length;guardar();render()}
+function cerrar(){const es=E();if(es.puntos.length<3){aviso('Traza al menos 3 esquinas');return}es.cerrado=true;es.diagonales=(es.diagonales||[]).filter(d=>d.a<es.puntos.length&&d.b<es.puntos.length);while(es.muros.length<es.puntos.length)es.muros.push({largo:null,espesor:null,zoclo:0,elementos:[]});es.muros.length=es.puntos.length;guardar();render()}
 function dibujaPlanta(){
   const es=E(),s=$('sv'),W=s.clientWidth,H=s.clientHeight,G=24;if(!W)return;
   const p=es.puntos,ms=muros(es);
@@ -133,8 +165,9 @@ function dibujaPlanta(){
     <circle cx="${mx}" cy="${my}" r="13" fill="var(--pn)" stroke="var(--ink)"/><text x="${mx}" y="${my+5}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">${m.i+1}</text>
     ${w.largo?`<text x="${mx}" y="${my+28}" text-anchor="middle" font-size="12" fill="var(--mut)">${cm(w.largo)}</text>`:''}</g>`}).join('');
   const abierto=!es.cerrado&&p.length>1?`<polyline points="${p.map(q=>q.join(',')).join(' ')}" fill="none" stroke="var(--ink)" stroke-width="3"/>`:'';
-  const pts=p.map((q,i)=>`<circle cx="${q[0]}" cy="${q[1]}" r="${i==0&&!es.cerrado?9:5}" fill="${i==0?'var(--ac)':'var(--ink)'}"/>`).join('');
-  s.innerHTML=grid+gruesos+abierto+lin+pts;
+  const pts=p.map((q,i)=>`<circle cx="${q[0]}" cy="${q[1]}" r="${i==0&&!es.cerrado?9:5}" fill="${i==0?'var(--ac)':'var(--ink)'}"/>${es.cerrado?`<text x="${q[0]+8}" y="${q[1]-8}" font-size="12" font-weight="700" fill="var(--ok)">${LET(i)}</text>`:''}`).join('');
+  const dgs=es.cerrado?(es.diagonales||[]).map(d=>p[d.a]&&p[d.b]?`<line x1="${p[d.a][0]}" y1="${p[d.a][1]}" x2="${p[d.b][0]}" y2="${p[d.b][1]}" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="6 5"/>`:'').join(''):'';
+  s.innerHTML=grid+gruesos+dgs+abierto+lin+pts;
   s.querySelectorAll('[data-m]').forEach(g=>g.onclick=ev=>{ev.stopPropagation();vista={v:'muro',e:vista.e,m:+g.dataset.m};render()});
   s.onpointerup=ev=>{if(es.cerrado)return;const r=s.getBoundingClientRect();let x=Math.round((ev.clientX-r.left-G/2)/G)*G+G/2,y=Math.round((ev.clientY-r.top-G/2)/G)*G+G/2;
     if(p.length&&Math.hypot(x-p[0][0],y-p[0][1])<G*.8&&p.length>2){cerrar();return}
