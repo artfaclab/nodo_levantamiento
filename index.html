@@ -42,7 +42,9 @@ button.p{background:var(--ink);color:var(--pn)}button.a{background:var(--ac);bor
 .thumbs div{position:relative}.thumbs img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;display:block}
 .thumbs button{position:absolute;top:4px;right:4px;min-height:28px;padding:0 8px;font-size:12px}
 #msg{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);background:var(--ink);color:var(--pn);padding:10px 16px;border-radius:8px;font-size:14px;display:none;z-index:9;max-width:90vw}
-.hid{display:none}details summary{cursor:pointer;color:var(--mut);font-size:14px}
+.hid{display:none}
+.sw{position:relative;margin-bottom:8px;border-radius:8px;overflow:hidden}.sw .lst{margin:0;position:relative;z-index:1;transition:transform .2s;touch-action:pan-y}.sw .del{position:absolute;inset:0 0 0 auto;width:110px;background:var(--ac);border-color:var(--ac);color:#fff;border-radius:0}
+@media(prefers-reduced-motion:reduce){.sw .lst{transition:none}}details summary{cursor:pointer;color:var(--mut);font-size:14px}
 </style></head><body>
 <header><b>NODO</b><small id="hd">Levantamiento</small></header>
 <main id="app"></main>
@@ -78,8 +80,7 @@ const TIPOS={
   contacto:{n:'Contacto',f:'punto',lado:1,c:[['altura','Altura']],def:{altura:300}},
   apagador:{n:'Apagador',f:'punto',lado:1,c:[['altura','Altura']],def:{altura:1200}}};
 const DE_FORMA={linea:['muro'],caja:['puerta','ventana','trabe','escalon','columna'],punto:['contacto','apagador']};
-const HERR={lineal:{n:'Medida lineal',f:'linea',t:['muro'],h:'Arrastra a lo largo del muro, de esquina a esquina.'},
-  inst:{n:'Instalación',f:'punto',t:['contacto','apagador'],h:'Toca donde está el contacto o apagador.'},
+const HERR={inst:{n:'Instalación',f:'punto',t:['contacto','apagador'],h:'Toca donde está el contacto o apagador.'},
   puerta:{n:'Puerta',f:'caja',t:['puerta'],h:'Arrastra sobre la puerta, de una esquina a la otra.'},
   ventana:{n:'Ventana',f:'caja',t:['ventana'],h:'Arrastra sobre la ventana.'},
   estr:{n:'Estructura',f:'caja',t:['columna','trabe','escalon'],h:'Arrastra sobre la columna, trabe o escalón.'}};
@@ -120,31 +121,36 @@ function inicio(){
   <div class="pn"><div class="g2"><div><label for="pUs">Técnico</label><input id="pUs" value="${esc(P.usuario)}"></div><div><label for="pFe">Fecha</label><input id="pFe" value="${esc(P.fecha)}"></div></div>
    <label for="pPr">Proyecto</label><input id="pPr" value="${esc(P.proyecto)}"><label for="pCl">Cliente</label><input id="pCl" value="${esc(P.cliente)}"></div>
   <h2>Espacios</h2>
-  ${P.espacios.map((e,i)=>`<button class="lst" data-e="${i}"><b>${esc(e.nombre)}</b><span>${e.muros.length} muros · ${e.muros.filter(w=>w.foto).length} fotos</span></button>`).join('')||'<p class="hint">Agrega el espacio que vas a medir: un cuarto, un vestidor, una cocina.</p>'}
+  ${P.espacios.map((e,i)=>`<div class="sw"><button class="del" data-del="${i}">Borrar</button><button class="lst" data-e="${i}"><b>${esc(e.nombre)}</b><span>${e.muros.length} muros · ${e.muros.filter(w=>w.foto).length} fotos</span></button></div>`).join('')+(P.espacios.length?'<p class="hint">Desliza un espacio a la izquierda para borrarlo.</p>':'')||'<p class="hint">Agrega el espacio que vas a medir: un cuarto, un vestidor, una cocina.</p>'}
   <button class="s" id="bNE" style="width:100%">+ Agregar espacio</button>
   <details class="pn" style="margin-top:12px"><summary>Más opciones</summary><div class="row" style="margin-top:10px"><button class="s" id="bNP">Nuevo proyecto</button><button class="s" id="bCargar">Cargar levantamiento</button></div></details>`;
   [['pUs','usuario'],['pFe','fecha'],['pPr','proyecto'],['pCl','cliente']].forEach(([id,k])=>$(id).oninput=ev=>{P[k]=ev.target.value;guardar()});
-  document.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{V={v:'espacio',e:+b.dataset.e,m:0};sel=-1;herr='sel';HIST=[];render()});
-  $('bNE').onclick=()=>{P.espacios.push({nombre:'ESPACIO '+String(P.espacios.length+1).padStart(2,'0'),altura:2400,espesor:150,cerrado:false,muros:[nuevoMuro()],fotos:[]});guardar();V={v:'espacio',e:P.espacios.length-1,m:0};sel=-1;herr='sel';HIST=[];render()};
+  document.querySelectorAll('[data-e]').forEach(b=>{let x0=null,dx=0,abierto=false;
+    b.onpointerdown=ev=>{x0=ev.clientX;dx=0};
+    b.onpointermove=ev=>{if(x0==null)return;dx=ev.clientX-x0;if(dx<0||abierto)b.style.transform=`translateX(${Math.max(-110,Math.min(0,(abierto?-110:0)+dx))}px)`};
+    b.onpointerup=()=>{if(x0==null)return;x0=null;if(dx<-50){abierto=true;b.style.transform='translateX(-110px)'}else if(abierto&&dx>30){abierto=false;b.style.transform=''}else if(abierto){}else b.style.transform=''};
+    b.onpointercancel=()=>{x0=null;b.style.transform=abierto?'translateX(-110px)':''};
+    b.onclick=()=>{if(Math.abs(dx)>10)return;if(abierto){abierto=false;b.style.transform='';return}V={v:'espacio',e:+b.dataset.e,m:0};sel=-1;herr='sel';HIST=[];render()}});
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{if(b.dataset.c){P.espacios.splice(+b.dataset.del,1);guardar();render()}else{b.dataset.c=1;b.textContent='¿Seguro?'}});
+  $('bNE').onclick=()=>{P.espacios.push({nombre:'ESPACIO '+String(P.espacios.length+1).padStart(2,'0'),espesor:150,cerrado:false,muros:[nuevoMuro()],fotos:[]});guardar();V={v:'espacio',e:P.espacios.length-1,m:0};sel=-1;herr='sel';HIST=[];render()};
   $('bNP').onclick=ev=>{const b=ev.target;if(b.dataset.c){P=nuevo();guardar();render()}else{b.dataset.c=1;b.textContent='Toca otra vez para borrar todo'}};
   $('bCargar').onclick=()=>$('fCargar').click();
   $('bar').innerHTML=`<button class="a" id="bEnv">Enviar</button>`;$('bEnv').onclick=enviar;
 }
-const nuevoMuro=()=>({largo:null,altura:null,zoclo:0,esquina:'rincon',angulo:90,foto:null});
+const nuevoMuro=(alto=null)=>({largo:null,altura:alto,zoclo:0,esquina:'rincon',angulo:90,foto:null});
 function muroHtml(es,w,i){
-  const n=es.muros.length,act=i===V.m,f=w.foto,ult=i===n-1,der=w.esquina!=='saliente';
+  const n=es.muros.length,act=i===V.m,f=w.foto;
   return`<section class="pn" id="mu${i}" style="${act?'border-color:var(--ac);border-width:2px':''}">
   <div class="row" style="justify-content:space-between"><h2 style="margin:0">Muro ${i+1}</h2><span class="${w.largo?'okt':'warn'}">${w.largo?'ancho '+cm(w.largo)+' cm':'falta el ancho'}</span></div>
+  ${i>0?`<div class="row" style="margin-top:6px"><span class="hint" style="margin:0">Giro desde el muro ${i}:</span><button class="${es.muros[i-1].esquina==='saliente'?'p':'s'}" data-gir="izq" data-w="${i-1}" style="min-height:36px">←</button><button class="${es.muros[i-1].esquina!=='saliente'?'p':'s'}" data-gir="der" data-w="${i-1}" style="min-height:36px">→</button></div>`:''}
   ${f?`<div class="foto" style="margin-top:8px"><canvas id="cv${i}" data-w="${i}"></canvas></div>
    <div class="tools" style="grid-template-columns:repeat(3,minmax(0,1fr))">${Object.entries(HERR).map(([k,h])=>`<button class="${act&&herr===k?'on':'s'}" data-h="${k}" data-w="${i}">${h.n}</button>`).join('')}<button class="s" data-des="${i}" ${act&&HIST.length?'':'disabled'}>↶ Deshacer</button></div>
    ${act?`<p class="hint">${herr==='sel'?'Elige qué vas a marcar, o toca una marca para ver sus medidas.':HERR[herr].h}</p>`:''}`
    :`<button class="vacio" data-tf="${i}" style="width:100%;margin-top:8px"><div><b style="font-size:18px">Tomar foto del muro ${i+1}</b><br><span class="hint">Párate frente al muro, de preferencia con el teléfono horizontal</span></div></button>`}
   <div id="ed${i}"></div>
   <div class="g3"><div><label for="wL${i}">Ancho (cm)</label><input id="wL${i}" data-w="${i}" data-k="largo" inputmode="decimal" value="${cm(w.largo)}"></div>
-   <div><label for="wA${i}">Alto (cm)</label><input id="wA${i}" data-w="${i}" data-k="altura" inputmode="decimal" placeholder="${cm(es.altura)}" value="${cm(w.altura)}"></div>
+   <div><label for="wA${i}">Alto (cm)</label><input id="wA${i}" data-w="${i}" data-k="altura" inputmode="decimal" value="${cm(w.altura)}"></div>
    <div><label for="wZ${i}">Zoclo (cm)</label><input id="wZ${i}" data-w="${i}" data-k="zoclo" inputmode="decimal" placeholder="sin" value="${w.zoclo?cm(w.zoclo):''}"></div></div>
-  <p class="hint" style="margin-top:10px">${ult?`¿Sigue otro muro? ¿Hacia dónde giras para verlo de frente?`:`Para ver el muro ${i+2} giras hacia:`}</p>
-  <div class="row"><button class="${!ult&&!der?'p':'s'}" data-gir="izq" data-w="${i}" style="flex:1">← ${ult?'Nuevo muro':'Izquierda'}</button><button class="${!ult&&der?'p':'s'}" data-gir="der" data-w="${i}" style="flex:1">${ult?'Nuevo muro':'Derecha'} →</button></div>
   <div class="row" style="margin-top:8px;justify-content:flex-end">${f?`<button class="s" data-tf="${i}">Otra foto</button>`:''}<button class="s" data-bm="${i}">Borrar muro</button></div>
   </section>`}
 function espacio(){
@@ -155,9 +161,9 @@ function espacio(){
   <p class="hint">Empieza por el muro de la entrada y recorre el cuarto siempre hacia tu derecha. La planta se arma sola.</p>
   ${n&&es.cerrado&&!pl.falt&&pl.cierre>20?`<p class="warn">Nota: la planta no cierra por ${cm(pl.cierre)} cm.</p>`:''}
   ${es.muros.map((w,i)=>muroHtml(es,w,i)).join('')}
-  ${n?'':`<button class="p" id="bNM" style="width:100%">+ Muro 1</button>`}
-  <div class="pn"><div class="g2"><div><label for="eAl">Alto del cuarto (cm)</label><input id="eAl" inputmode="decimal" value="${cm(es.altura)}"></div><div><label for="eEs">Espesor de muro (cm)</label><input id="eEs" inputmode="decimal" value="${cm(es.espesor)}"></div></div>
-   <label style="display:flex;gap:10px;align-items:center;margin-top:10px;font-size:15px;color:var(--ink)"><input type="checkbox" id="eCe" ${es.cerrado?'checked':''} style="width:24px;min-height:24px"> El último muro cierra con el muro 1 (cuarto completo)</label></div>
+  <div id="nuevo">${n?`<button class="p" id="bMas" style="width:100%;min-height:64px;font-size:22px">+ Muro ${n+1}</button>`:`<button class="p" id="bNM" style="width:100%;min-height:64px;font-size:20px">+ Muro 1</button>`}</div>
+  <div class="pn" style="margin-top:12px">
+   <label style="display:flex;gap:10px;align-items:center;font-size:15px;color:var(--ink);margin:0"><input type="checkbox" id="eCe" ${es.cerrado?'checked':''} style="width:24px;min-height:24px"> El último muro cierra con el muro 1 (cuarto completo)</label></div>
   <div class="pn"><b>Fotos generales del espacio</b><div class="thumbs">${es.fotos.map((f,i)=>`<div><img src="${f.img}" alt="Foto ${i+1}"><button data-bf="${i}">×</button></div>`).join('')}</div><button class="s" id="bFG" style="margin-top:8px">+ Fotos</button></div>`;
   dibujaPlanta($('pl'),es,V.m);
   es.muros.forEach((w,i)=>{if(w.foto)preparaFoto(i)});
@@ -165,15 +171,18 @@ function espacio(){
   $('eNom').oninput=ev=>{es.nombre=ev.target.value;guardar()};
   $('bBE').onclick=ev=>{const b=ev.target;if(b.dataset.c){P.espacios.splice(V.e,1);guardar();V={v:'inicio'};render()}else{b.dataset.c=1;b.textContent='¿Seguro?'}};
   if($('bNM'))$('bNM').onclick=()=>{es.muros.push(nuevoMuro());V.m=0;guardar();render(true)};
+  if($('bMas'))$('bMas').onclick=()=>{$('nuevo').innerHTML=`<p class="hint">Para ver el muro ${n+1} de frente, ¿hacia dónde giras desde el muro ${n}?</p><div class="row"><button class="p" id="nIz" style="flex:1;min-height:64px;font-size:20px">← Izquierda</button><button class="p" id="nDe" style="flex:1;min-height:64px;font-size:20px">Derecha →</button></div>`;
+    const agr=lado=>{es.muros[n-1].esquina=lado==='der'?'rincon':'saliente';es.muros.push(nuevoMuro(es.muros[n-1].altura));V.m=n;sel=-1;herr='sel';HIST=[];guardar();render(true);const q=$('mu'+n);if(q)q.scrollIntoView({behavior:'smooth',block:'start'})};
+    $('nIz').onclick=()=>agr('izq');$('nDe').onclick=()=>agr('der')};
   const activa=i=>{if(V.m!==i){V.m=i;sel=-1;herr='sel';HIST=[]}};
-  document.querySelectorAll('input[data-k]').forEach(inp=>inp.onchange=ev=>{const i=+inp.dataset.w,w=es.muros[i],v=mm(ev.target.value);w[inp.dataset.k]=inp.dataset.k==='zoclo'?(v||0):v;activa(i);guardar();render(true)});
+  document.querySelectorAll('input[data-k]').forEach(inp=>inp.onchange=ev=>{const i=+inp.dataset.w,w=es.muros[i],k=inp.dataset.k,v=mm(ev.target.value),viejo=w[k];w[k]=k==='zoclo'?(v||0):v;
+    if(k==='altura')for(let j=i+1;j<es.muros.length;j++){if(es.muros[j].altura==null||es.muros[j].altura===viejo)es.muros[j].altura=v;else break}
+    activa(i);guardar();render(true)});
   document.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>{const i=+b.dataset.w;activa(i);herr=herr===b.dataset.h?'sel':b.dataset.h;render(true)});
   document.querySelectorAll('[data-des]').forEach(b=>b.onclick=()=>{const i=+b.dataset.des;if(V.m!==i||!HIST.length)return;es.muros[i].foto.marcas=JSON.parse(HIST.pop());sel=-1;guardar();render(true)});
   document.querySelectorAll('[data-tf]').forEach(b=>b.onclick=()=>{activa(+b.dataset.tf);$('fFoto').click()});
-  document.querySelectorAll('[data-gir]').forEach(b=>b.onclick=()=>{const i=+b.dataset.w;es.muros[i].esquina=b.dataset.gir==='der'?'rincon':'saliente';
-    if(i===es.muros.length-1)es.muros.push(nuevoMuro());activa(i+1);guardar();render(true);const s=$('mu'+(i+1));if(s)s.scrollIntoView({behavior:'smooth',block:'start'})});
+  document.querySelectorAll('[data-gir]').forEach(b=>b.onclick=()=>{const i=+b.dataset.w;es.muros[i].esquina=b.dataset.gir==='der'?'rincon':'saliente';guardar();render(true)});
   document.querySelectorAll('[data-bm]').forEach(b=>b.onclick=()=>{if(b.dataset.c){es.muros.splice(+b.dataset.bm,1);V.m=0;sel=-1;HIST=[];guardar();render(true)}else{b.dataset.c=1;b.textContent='¿Seguro?'}});
-  $('eAl').onchange=ev=>{es.altura=mm(ev.target.value)||es.altura;guardar();render(true)};$('eEs').onchange=ev=>{es.espesor=mm(ev.target.value)||es.espesor;guardar()};
   $('eCe').onchange=ev=>{es.cerrado=ev.target.checked;guardar();render(true)};
   $('bFG').onclick=()=>$('fFotos').click();
   document.querySelectorAll('[data-bf]').forEach(b=>b.onclick=()=>{es.fotos.splice(+b.dataset.bf,1);guardar();render(true)});
@@ -190,7 +199,7 @@ function pinta(i=V.m){
   const w=E().muros[i];dibujaMarcas(x,w.foto.marcas,c.width,c.height,i===V.m?sel:-1,1,m=>etiquetaDe(w,m,E()));
 }
 function etiquetaDe(w,m,es){const t=TIPOS[m.tipo],d=m.datos||{};if(!t)return'?';
-  if(m.tipo==='muro')return d.eje==='v'?'Alto '+(cm(w.altura||es.altura)||'?'):'Ancho '+(cm(w.largo)||'?');
+  if(m.tipo==='muro')return d.eje==='v'?'Alto '+(cm(w.altura)||'?'):'Ancho '+(cm(w.largo)||'?');
   const k=w.foto.marcas.filter(q=>q.tipo===m.tipo).indexOf(m)+1;
   return`${t.n.split(' ')[0]} ${k} ${t.c.map(([q])=>cm(d[q])||'?').join('×')}${t.lado&&d.dist!=null?` · ${d.lado==='der'?'der':'izq'} ${cm(d.dist)}`:''}`}
 function dibujaMarcas(x,marcas,W,H,s,esc1,etiq){
@@ -244,7 +253,7 @@ function editor(){
 
 /* ---------- fotos ---------- */
 function comprime(file,max=1600){return new Promise((ok,mal)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{const r=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*r);c.height=Math.round(im.height*r);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL('image/jpeg',.72))};im.onerror=mal;im.src=u})}
-$('fFoto').onchange=async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;try{const img=await comprime(f);const w=M();w.foto={img,marcas:w.foto?w.foto.marcas:[]};herr='lineal';guardar();render(true);aviso('Marca el ancho del muro con una línea de esquina a esquina')}catch(e){aviso('No se pudo leer la foto')}};
+$('fFoto').onchange=async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;try{const img=await comprime(f);const w=M();w.foto={img,marcas:w.foto?w.foto.marcas:[]};herr='sel';guardar();render(true);aviso('Marca puertas, ventanas, instalaciones o estructura sobre la foto')}catch(e){aviso('No se pudo leer la foto')}};
 $('fFotos').onchange=async ev=>{const es=E();for(const f of ev.target.files){try{es.fotos.push({img:await comprime(f,1280)})}catch(e){}}ev.target.value='';guardar();render(true)};
 $('fCargar').onchange=async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;try{const d=JSON.parse(await f.text());if(d.formato!=='NODO-ESPACIO'||d.version!==2)throw 0;P=d.fuente||d;guardar();V={v:'inicio'};render();aviso('Levantamiento cargado')}catch(e){aviso('Ese archivo no es un levantamiento de esta versión')}};
 
@@ -253,8 +262,9 @@ async function exportar(){
   const out={formato:'NODO-ESPACIO',version:2,unidades:'mm',proyecto:P.proyecto,cliente:P.cliente,usuario:P.usuario,fecha:P.fecha,generado:new Date().toISOString(),espacios:[]};
   for(const es of P.espacios){const pl=planta(es),cer=es.cerrado&&es.muros.length>2;const acot=[];for(let i=0;i<es.muros.length;i++){const w=es.muros[i];if(w.foto)acot.push({muro:i+1,img:await fotoAcotada(w,es)})}
     const vert=(cer?pl.pts.slice(0,-1):pl.pts).map(p=>[Math.round(p[0]),Math.round(-p[1])]);   // Y hacia abajo, como lo lee NODO
-    out.espacios.push({nombre:es.nombre,altura:es.altura,espesor:es.espesor,abierta:!cer,cierre:cer?pl.cierre:null,vertices:vert,
-      muros:es.muros.map((w,i)=>({n:i+1,largo:w.largo,altura:w.altura||es.altura,espesor:es.espesor,zoclo:w.zoclo||0,esquina:w.esquina,angulo:w.angulo||90,
+    const altos=es.muros.map(w=>w.altura).filter(Boolean),amin=altos.length?Math.min(...altos):2400;
+    out.espacios.push({nombre:es.nombre,altura:amin,espesor:es.espesor||150,abierta:!cer,cierre:cer?pl.cierre:null,vertices:vert,
+      muros:es.muros.map((w,i)=>({n:i+1,largo:w.largo,altura:w.altura||amin,espesor:es.espesor||150,zoclo:w.zoclo||0,esquina:w.esquina,angulo:w.angulo||90,
         elementos:(w.foto?w.foto.marcas:[]).filter(m=>m.tipo!=='muro').map(m=>{const d=m.datos,t=TIPOS[m.tipo],an=d.ancho||0;
           let x=d.dist;if(x!=null&&d.lado==='der'&&w.largo)x=w.largo-x-(t.f==='caja'?an:0);
           const o={tipo:m.tipo,lado:d.lado,dist:d.dist,x};t.c.forEach(([k])=>o[k]=d[k]??null);return o})})),
@@ -269,7 +279,7 @@ function pdf(out){
   txt('NODO · Levantamiento',mg,26,22,true);txt('Grupo Ensamble',mg,34,11);
   [['Proyecto',out.proyecto],['Cliente',out.cliente],['Técnico',out.usuario],['Fecha',out.fecha]].forEach(([k,v],i)=>{txt(k,mg,56+i*9,10);txt(v||'-',mg+32,56+i*9,12,true)});
   txt('Medidas en centímetros. Distancias de puertas, ventanas y contactos desde la esquina indicada, viendo el muro de frente.',mg,100,9);
-  out.espacios.forEach((es,ei)=>{const src=P.espacios[ei];doc.addPage();txt(es.nombre,mg,22,16,true);txt(`Altura ${cm(es.altura)} · espesor de muro ${cm(es.espesor)}${es.abierta?' · planta abierta':es.cierre>20?` · no cierra por ${cm(es.cierre)}`:''}`,mg,29,10);
+  out.espacios.forEach((es,ei)=>{const src=P.espacios[ei];doc.addPage();txt(es.nombre,mg,22,16,true);txt(`${es.abierta?'Planta abierta':es.cierre>20?`No cierra por ${cm(es.cierre)}`:'Planta cerrada'}`,mg,29,10);
     const pl=planta(src),pts=pl.pts.map(p=>[p[0],-p[1]]),xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),bx=[mg,38,W-2*mg,120];
     const k=Math.min(bx[2]/Math.max(Math.max(...xs)-Math.min(...xs),1),bx[3]/Math.max(Math.max(...ys)-Math.min(...ys),1))*.85,ox=bx[0]+(bx[2]-(Math.max(...xs)-Math.min(...xs))*k)/2-Math.min(...xs)*k,oy=bx[1]+(bx[3]-(Math.max(...ys)-Math.min(...ys))*k)/2-Math.min(...ys)*k;
     doc.setLineWidth(.8);src.muros.forEach((w,i)=>{const a=pts[i],b=pts[i+1];doc.line(ox+a[0]*k,oy+a[1]*k,ox+b[0]*k,oy+b[1]*k);txt(`${i+1}: ${cm(w.largo)||'?'}`,ox+(a[0]+b[0])/2*k+2,oy+(a[1]+b[1])/2*k-2,9,true)});
