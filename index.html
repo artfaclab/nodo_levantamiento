@@ -97,7 +97,7 @@ const HERR={marco:{n:'Marco',f:'marco',t:['marco'],h:'Arrastra de una esquina de
   ventana:{n:'Ventana',f:'caja',t:['ventana'],h:'Arrastra sobre la ventana.'},
   inst:{n:'Instalación',f:'punto',t:['contacto','apagador','toma','caja'],h:'Toca el centro del contacto, apagador o toma de agua (las cajas, en su esquina derecha).'},
   estr:{n:'Estructura',f:'caja',t:['columna','trabe','escalon'],h:'Arrastra sobre la columna, trabe o escalón.'},
-  cota:{n:'Cota',f:'cota',t:['cota'],h:'Arrastra de una orilla a otra (del marco, una puerta, un contacto…). Se pega sola a los puntos guía.'}};
+  cota:{n:'Cota',f:'cota',t:['cota'],h:'Arrastra de un punto verde a otro: orillas del marco o de una caja, o el centro de un contacto. Se pega sola.'}};
 const OPC={contacto:['contacto','apagador','toma','caja'],apagador:['contacto','apagador','toma','caja'],toma:['contacto','apagador','toma','caja'],caja:['contacto','apagador','toma','caja'],puerta:['puerta'],ventana:['ventana'],columna:['columna','trabe','escalon'],trabe:['columna','trabe','escalon'],escalon:['columna','trabe','escalon'],marco:['marco'],cota:['cota']};
 let HIST=[];const snap=()=>{const f=M().foto;if(f){HIST.push(JSON.stringify(f.marcas));if(HIST.length>40)HIST.shift()}};
 const COL={marco:'#ffffff',puerta:'#ff8a00',ventana:'#2fb6ff',trabe:'#c38bff',escalon:'#c38bff',columna:'#c38bff',contacto:'#4fc3f7',apagador:'#ff5a3c',toma:'#00e0b0',caja:'#ffd400',cota:'#c6f000'};
@@ -297,7 +297,7 @@ function nodos(ms){const out=[];ms.forEach(m=>{if(m.tipo==='cota')return;
   if(m.forma==='punto')out.push({id:m.id,ref:'c',x:m.p[0],y:m.p[1],x1:m.p[0]-.04,x2:m.p[0]+.04,y1:m.p[1]-.04,y2:m.p[1]+.04});
   else{const x1=Math.min(m.p[0],m.p[2]),x2=Math.max(m.p[0],m.p[2]),y1=Math.min(m.p[1],m.p[3]),y2=Math.max(m.p[1],m.p[3]);
     out.push({id:m.id,ref:'l',x:x1,y:(y1+y2)/2,v:1,y1,y2},{id:m.id,ref:'r',x:x2,y:(y1+y2)/2,v:1,y1,y2},{id:m.id,ref:'t',x:(x1+x2)/2,y:y1,h:1,x1,x2},{id:m.id,ref:'b',x:(x1+x2)/2,y:y2,h:1,x1,x2})}});return out}
-function pega(ms,p,eje){let best=null,bd=.06;nodos(ms).forEach(n=>{let d;
+function pega(ms,p,eje){let best=null,bd=.085;nodos(ms).forEach(n=>{let d;
     if(eje==='h'){if(n.h)return;const fuera=Math.max(0,(n.y1??n.y)-.08-p[1],p[1]-(n.y2??n.y)-.08);d=Math.abs(p[0]-n.x)+fuera}
     else{if(n.v)return;const fuera=Math.max(0,(n.x1??n.x)-.08-p[0],p[0]-(n.x2??n.x)-.08);d=Math.abs(p[1]-n.y)+fuera}
     if(d<bd){bd=d;best=n}});return best}
@@ -310,10 +310,10 @@ function dibujaMarcas(x,w,W,H,s,guias,reg){
   ms.forEach((m,i)=>{const t=TIPOS[m.tipo];if(!t||m.forma==='cota')return;const c=COL[m.tipo]||'#fff',on=i===s,d=m.datos||{},p=m.p.map((v,k)=>v*(k%2?H:W));x.strokeStyle=c;x.fillStyle=c;x.lineWidth=on?lw*2:lw;x.setLineDash([]);
     if(m.forma==='marco'||m.forma==='caja'){const bx=Math.min(p[0],p[2]),by=Math.min(p[1],p[3]),bw=Math.abs(p[2]-p[0]),bh=Math.abs(p[3]-p[1]);
       if(m.forma==='marco')x.setLineDash([lw*4,lw*3]);x.strokeRect(bx,by,bw,bh);x.setLineDash([]);if(on){x.globalAlpha=.15;x.fillRect(bx,by,bw,bh);x.globalAlpha=1}
-      if(m.forma==='marco'){const a=num(w.largo),h=num(w.altura);rot(a?`↔ ${a}`:'↔ ancho ?',bx+bw/2-fs*2,by+bh-lw*3,c,{id:m.id,key:'largo'},!a);rot(h?`↕ ${h}`:'↕ alto ?',bx+lw*3,by+bh/2,c,{id:m.id,key:'altura'},!h)}
+      if(m.forma==='marco'){const a=num(w.largo),h=num(w.altura);rot(a?`muro ${a}`:'ancho muro ?',bx+bw-fs*6,by+bh-lw*3,c,{id:m.id,key:'largo'},!a);rot(h?`alto ${h}`:'alto muro ?',bx+lw*3,by+fs*2.2,c,{id:m.id,key:'altura'},!h)}
       else{rot(nombreN(ms,m),bx,by-lw*2,c);const tieneA=t.c.some(([k])=>k==='alto');
-        rot(d.ancho!=null?`↔ ${num(d.ancho)}`:'↔ ?',bx+bw/2-fs*1.5,by+bh-lw*3,c,{id:m.id,key:'ancho'},d.ancho==null);
-        if(tieneA)rot(d.alto!=null?`↕ ${num(d.alto)}`:'↕ ?',bx+bw-fs*3.2,by+bh/2,c,{id:m.id,key:'alto'},d.alto==null)}}
+        rot(d.ancho!=null?`a ${num(d.ancho)}`:'ancho ?',bx+bw/2-fs*1.5,by+bh-lw*3,c,{id:m.id,key:'ancho'},d.ancho==null);
+        if(tieneA)rot(d.alto!=null?`h ${num(d.alto)}`:'alto ?',bx+bw-fs*3.4,by+bh/2,c,{id:m.id,key:'alto'},d.alto==null)}}
     else{x.beginPath();x.arc(p[0],p[1],lw*3.5,0,7);x.fill();rot(nombreN(ms,m),p[0]+lw*5,p[1]-lw*3,c)}});
   ms.forEach((m,i)=>{if(m.forma!=='cota')return;const d=m.datos,c=COL.cota,on=i===s,p=m.p.map((v,k)=>v*(k%2?H:W));x.strokeStyle=c;x.lineWidth=on?lw*1.6:lw*.9;
     let a=[p[0],p[1]],b=[p[2],p[3]];
@@ -322,7 +322,7 @@ function dibujaMarcas(x,w,W,H,s,guias,reg){
     [a,b].forEach(([u,v])=>{x.beginPath();x.moveTo(u-q*Math.sin(ang),v+q*Math.cos(ang));x.lineTo(u+q*Math.sin(ang),v-q*Math.cos(ang));x.stroke()});
     if(!(d.a&&d.b)){x.setLineDash([lw,lw*2]);x.strokeRect(a[0]-lw*2,a[1]-lw*2,lw*4,lw*4);x.setLineDash([])}
     const v=d.valor!=null?cm(d.valor)+(d.nota?' '+d.nota:''):(d.nota||'?');rot(v,(a[0]+b[0])/2-fs,(a[1]+b[1])/2-lw*2,c,{id:m.id,key:'valor'},d.valor==null&&!d.nota)});
-  if(guias){x.fillStyle='#c6f000';nodos(ms).forEach(n=>{x.beginPath();x.arc(n.x*W,n.y*H,lw*1.8,0,7);x.fill()})}
+  if(guias)nodos(ms).forEach(n=>{x.beginPath();x.arc(n.x*W,n.y*H,lw*3.4,0,7);x.fillStyle='#c6f000';x.fill();x.lineWidth=Math.max(2,lw*.8);x.strokeStyle='#000';x.stroke()})
 }
 /* ---------- escribir la medida sobre la foto ---------- */
 let EDIT=null;const LBL={};
@@ -376,7 +376,7 @@ function agrega(m,tipo){const w=M(),ms=w.foto.marcas,t=TIPOS[tipo];
   snap();m.id=uid();m.tipo=tipo;m.datos=Object.assign({},t.def||{});
   if(m.forma==='cota'){const im=IMGS[V.m]||{width:1,height:1},dx=(m.p[2]-m.p[0])*im.width,dy=(m.p[3]-m.p[1])*im.height,eje=Math.abs(dx)>=Math.abs(dy)?'h':'v';
     const a=pega(ms,[m.p[0],m.p[1]],eje),b=pega(ms,[m.p[2],m.p[3]],eje);m.datos={eje,a:a?{id:a.id,ref:a.ref}:null,b:b?{id:b.id,ref:b.ref}:null,valor:null,nota:''};
-    if(a&&b&&a.id===b.id&&a.ref===b.ref)m.datos.b=null}
+    if(!a||!b||(a.id===b.id&&a.ref===b.ref)){aviso('La cota tiene que empezar y terminar en un punto verde (orilla del marco, de una caja o el centro de un contacto).');herr='cota';render(true);return}}
   ms.push(m);sel=ms.length-1;herr='sel';const vs=vacios(w,m);EDIT=vs.length?{i:V.m,id:m.id,key:vs[0]}:null;guardar();render(true)}
 function editor(){
   const ed=$('ed'+V.m);if(!ed)return;const w=M(),f=w.foto;if(!f||sel<0||!f.marcas[sel]){ed.innerHTML='';return}
@@ -386,7 +386,6 @@ function editor(){
   ed.innerHTML=`<div class="row" style="margin:8px 0;gap:6px">
     ${op.length>1?`<select id="mT" style="width:auto;flex:1">${op.map(k=>`<option value="${k}" ${k===m.tipo?'selected':''}>${TIPOS[k].n}</option>`).join('')}</select>`:`<b style="flex:1">${esc(t.f==='cota'?'Cota':nombreN(ms,m))}</b>`}
     ${sob?`<input id="mV_sobresale" inputmode="decimal" placeholder="sobresale cm" value="${cm(d.sobresale)}" style="width:8.5em">`:''}
-    ${m.tipo==='cota'?`<input id="mN" placeholder="nota" value="${esc(d.nota)}" style="width:8em">`:''}
     ${est}<button class="s" id="mX" style="min-height:44px">Borrar</button></div>
     ${t.regla?`<p class="hint" style="margin-top:0">Se mide ${t.regla}.</p>`:''}`;
   if($('mT'))$('mT').onchange=ev=>{snap();m.tipo=ev.target.value;guardar();pinta();editor()};
@@ -422,16 +421,37 @@ function pdf(out){
   [['Proyecto',out.proyecto],['Cliente',out.cliente],['Técnico',out.usuario],['Fecha',out.fecha]].forEach(([k,v],i)=>{txt(k,mg,56+i*9,10);txt(v||'-',mg+32,56+i*9,12,true)});
   txt('Medidas en centímetros. Distancias de puertas, ventanas y contactos desde la esquina indicada, viendo el muro de frente.',mg,100,9);
   out.espacios.forEach((es,ei)=>{const src=P.espacios[ei];doc.addPage();txt(es.nombre,mg,22,16,true);txt(`${es.abierta?'Planta abierta':es.cierre>20?`No cierra por ${cm(es.cierre)}`:'Planta cerrada'}`,mg,29,10);
-    const pl=planta(src),pts=pl.pts.map(p=>[p[0],-p[1]]),xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),bx=[mg,38,W-2*mg,120];
-    const k=Math.min(bx[2]/Math.max(Math.max(...xs)-Math.min(...xs),1),bx[3]/Math.max(Math.max(...ys)-Math.min(...ys),1))*.85,ox=bx[0]+(bx[2]-(Math.max(...xs)-Math.min(...xs))*k)/2-Math.min(...xs)*k,oy=bx[1]+(bx[3]-(Math.max(...ys)-Math.min(...ys))*k)/2-Math.min(...ys)*k;
-    doc.setLineWidth(.8);src.muros.forEach((w,i)=>{const a=pts[i],b=pts[i+1];doc.line(ox+a[0]*k,oy+a[1]*k,ox+b[0]*k,oy+b[1]*k);txt(`${i+1}: ${cm(w.largo)||'?'}`,ox+(a[0]+b[0])/2*k+2,oy+(a[1]+b[1])/2*k-2,9,true)});
-    pts.forEach((p,i)=>{if(!(src.cerrado&&i===pts.length-1))txt(LET(i),ox+p[0]*k+1.5,oy+p[1]*k-1.5,8)});
+    const pl=planta(src),pts=pl.pts.map(p=>[p[0],-p[1]]),xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),bx=[mg+16,52,W-2*mg-32,H-52-40];
+    const k=Math.min(bx[2]/Math.max(Math.max(...xs)-Math.min(...xs),1),bx[3]/Math.max(Math.max(...ys)-Math.min(...ys),1)),ox=bx[0]+(bx[2]-(Math.max(...xs)-Math.min(...xs))*k)/2-Math.min(...xs)*k,oy=bx[1]+(bx[3]-(Math.max(...ys)-Math.min(...ys))*k)/2-Math.min(...ys)*k;
     const PX=q=>[ox+q[0]*k,oy-q[1]*k];
-    huecos(src).forEach(h=>{const a=PX(h.p0),b=PX(h.p1);doc.setDrawColor(255,255,255);doc.setLineWidth(1.6);doc.line(a[0],a[1],b[0],b[1]);doc.setDrawColor(0,0,0);doc.setLineWidth(.25);
+    // cota de plano: línea paralela al muro con remates y texto centrado y derecho
+    const cota=(a,b,dir,off,t,s2=8)=>{const L=Math.hypot(b[0]-a[0],b[1]-a[1]);if(L<1)return;const n=[dir[0]*off,dir[1]*off],A=[a[0]+n[0],a[1]+n[1]],B=[b[0]+n[0],b[1]+n[1]];
+      doc.setLineWidth(.2);doc.line(A[0],A[1],B[0],B[1]);[[a,A],[b,B]].forEach(([u,v])=>doc.line(u[0]+n[0]*.25,u[1]+n[1]*.25,v[0]+dir[0]*1.2,v[1]+dir[1]*1.2));
+      const ux=(B[0]-A[0])/L,uy=(B[1]-A[1])/L;[A,B].forEach(q=>doc.line(q[0]-ux*.9+dir[0]*.9,q[1]-uy*.9+dir[1]*.9,q[0]+ux*.9-dir[0]*.9,q[1]+uy*.9-dir[1]*.9));
+      let ang=-Math.atan2(uy,ux)*180/Math.PI;if(ang>90)ang-=180;if(ang<-90)ang+=180;const mx=(A[0]+B[0])/2+dir[0]*1.6,my=(A[1]+B[1])/2+dir[1]*1.6;
+      doc.setFont('helvetica','normal');doc.setFontSize(s2);doc.text(t,mx,my,{angle:ang,align:'center',baseline:'middle'})};
+    doc.setLineWidth(.9);src.muros.forEach((w,i)=>{const a=PX(pl.pts[i]),b=PX(pl.pts[i+1]);doc.line(a[0],a[1],b[0],b[1])});
+    huecos(src).forEach(h=>{const a=PX(h.p0),b=PX(h.p1);doc.setDrawColor(255,255,255);doc.setLineWidth(1.8);doc.line(a[0],a[1],b[0],b[1]);doc.setDrawColor(0,0,0);doc.setLineWidth(.25);
       if(h.tipo==='puerta'){const ar=h.arco.map(PX);for(let j=0;j<ar.length-1;j++)doc.line(ar[j][0],ar[j][1],ar[j+1][0],ar[j+1][1]);doc.line(a[0],a[1],ar[8][0],ar[8][1])}
-      else{const L=Math.hypot(b[0]-a[0],b[1]-a[1])||1,nx=-(b[1]-a[1])/L*.6,ny=(b[0]-a[0])/L*.6;[1,-1].forEach(q=>doc.line(a[0]+nx*q,a[1]+ny*q,b[0]+nx*q,b[1]+ny*q))}});
-    doc.setLineWidth(.8);
-    y=170;es.muros.forEach(w=>{if(y>H-20){doc.addPage();y=22}txt(`Muro ${w.n}: ancho ${cm(w.largo)||'?'} · alto ${cm(w.altura)}${w.zoclo?` · zoclo ${cm(w.zoclo)}`:''} · ${w.esquina==='saliente'?'gira a la izquierda':'gira a la derecha'}`,mg,y,10,true);y+=6;
+      else{const L=Math.hypot(b[0]-a[0],b[1]-a[1])||1,nx=-(b[1]-a[1])/L*.7,ny=(b[0]-a[0])/L*.7;[1,-1].forEach(q=>doc.line(a[0]+nx*q,a[1]+ny*q,b[0]+nx*q,b[1]+ny*q))}});
+    src.muros.forEach((w,i)=>{const pa=pl.pts[i],pb=pl.pts[i+1],L0=Math.hypot(pb[0]-pa[0],pb[1]-pa[1])||1,d=[(pb[0]-pa[0])/L0,(pb[1]-pa[1])/L0];
+      const a=PX(pa),b=PX(pb),Lp=Math.hypot(b[0]-a[0],b[1]-a[1])||1,dp=[(b[0]-a[0])/Lp,(b[1]-a[1])/Lp],adentro=[-d[1],-d[0]],afuera=[-adentro[0],-adentro[1]];   // en hoja: Y hacia abajo
+      const nin=[d[1],d[0]].map((v,q)=>q===0?v:v),ni=PX([pa[0]+d[1],pa[1]-d[0]]),dirIn=[ni[0]-a[0],ni[1]-a[1]],nl=Math.hypot(...dirIn)||1,dIn=[dirIn[0]/nl,dirIn[1]/nl],dOut=[-dIn[0],-dIn[1]];
+      // total por fuera
+      cota(a,b,dOut,7,`${w.largo?cm(w.largo):'?'}`,9);
+      // cadena por dentro: esquina → elementos → esquina
+      const es2=elems(w).filter(e=>e.x!=null&&e.ancho&&TIPOS[e.tipo].f==='caja').sort((p,q)=>p.x-q.x);
+      if(es2.length&&w.largo){const marks=[0];es2.forEach(e=>{marks.push(e.x,e.x+e.ancho)});marks.push(w.largo);
+        const at=v=>[a[0]+dp[0]*Lp*v/w.largo,a[1]+dp[1]*Lp*v/w.largo];
+        for(let q=0;q<marks.length-1;q++){const v0=marks[q],v1=marks[q+1];if(v1-v0<1)continue;cota(at(v0),at(v1),dIn,5,cm(v1-v0),7)}}
+      // instalaciones: símbolo y distancia a la esquina
+      elems(w).filter(e=>TIPOS[e.tipo].f==='punto'&&e.x!=null&&w.largo).forEach(e=>{const P2=[a[0]+dp[0]*Lp*e.x/w.largo+dIn[0]*1.5,a[1]+dp[1]*Lp*e.x/w.largo+dIn[1]*1.5];
+        doc.setLineWidth(.25);doc.circle(P2[0],P2[1],.9,'S');doc.setFontSize(6);doc.text(`${{contacto:'C',apagador:'A',toma:'T',caja:'R'}[e.tipo]||'?'} ${cm(e.dist)}${e.lado==='der'?'d':'i'} h${cm(e.altura)}`,P2[0]+dIn[0]*2.5,P2[1]+dIn[1]*2.5,{align:'center'})});
+      const mx=(a[0]+b[0])/2+dIn[0]*12,my=(a[1]+b[1])/2+dIn[1]*12;doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text(`${i+1}`,mx,my,{align:'center',baseline:'middle'})});
+    pts.forEach((p,i)=>{if(!(src.cerrado&&i===pts.length-1))txt(LET(i),ox+p[0]*k+1.5,oy+p[1]*k-1.5,8,true)});
+    doc.setFont('helvetica','normal');doc.setFontSize(7);doc.text(doc.splitTextToSize('Cotas en cm. Por fuera: ancho total del muro. Por dentro: tramos entre esquinas, puertas, ventanas y columnas. C contacto · A apagador · T toma · R registro (distancia a la esquina i izquierda / d derecha, h altura).',W-2*mg),mg,H-18);
+    doc.addPage();txt(`${es.nombre} · medidas por muro`,mg,22,13,true);doc.setLineWidth(.8);
+    y=32;es.muros.forEach(w=>{if(y>H-20){doc.addPage();y=22}txt(`Muro ${w.n}: ancho ${cm(w.largo)||'?'} · alto ${cm(w.altura)}${w.zoclo?` · zoclo ${cm(w.zoclo)}`:''} · ${w.esquina==='saliente'?'gira a la izquierda':'gira a la derecha'}`,mg,y,10,true);y+=6;
       w.elementos.forEach(e=>{const t=TIPOS[e.tipo]||{n:e.tipo},q=[];[['ancho','ancho'],['alto','alto'],['peralte','peralte'],['antepecho','antepecho'],['altura','altura'],['sobresale','sobresale']].forEach(([k,l])=>{if(e[k]!=null)q.push(`${l} ${cm(e[k])}`)});
         txt(`   ${t.n}: ${q.join(', ')||'sin medidas'}${e.dist!=null?`, a ${cm(e.dist)} de la esquina ${e.lado==='der'?'derecha':'izquierda'}`:', sin ubicar'}`,mg,y,9);y+=5});y+=2});
     es.fotos.forEach(f=>{doc.addPage();txt(`${es.nombre} · ${f.muro?'Muro '+f.muro:'Foto general'}`,mg,20,13,true);const pr=doc.getImageProperties(f.img),mw=W-2*mg,mh=H-50,r=Math.min(mw/pr.width,mh/pr.height);doc.addImage(f.img,'JPEG',mg,28,pr.width*r,pr.height*r)})});
