@@ -70,28 +70,35 @@ const mm=v=>{const n=parseFloat(String(v).replace(',','.'));return isFinite(n)?M
 const E=()=>P.espacios[V.e],M=()=>E().muros[V.m];
 const LET=i=>String.fromCharCode(65+i);
 
-/* tipos de marca: forma sobre la foto y medidas que pide */
+/* tipos de marca: qué es, cómo se dibuja y qué medidas propias pide (la posición sale de las cotas) */
 const TIPOS={
-  muro:{n:'Largo del muro',f:'linea',c:[['largo','Largo']]},
-  puerta:{n:'Puerta',f:'caja',lado:1,c:[['ancho','Ancho'],['alto','Alto']],def:{ancho:900,alto:2100}},
-  ventana:{n:'Ventana',f:'caja',lado:1,c:[['ancho','Ancho'],['alto','Alto'],['antepecho','Antepecho']],def:{ancho:1200,alto:1200,antepecho:900}},
-  trabe:{n:'Trabe',f:'caja',lado:1,c:[['ancho','Ancho'],['peralte','Peralte (baja del techo)'],['sobresale','Sobresale del muro']]},
-  escalon:{n:'Escalón',f:'caja',lado:1,c:[['ancho','Ancho'],['alto','Alto'],['sobresale','Sobresale del muro']]},
-  columna:{n:'Columna',f:'caja',lado:1,c:[['ancho','Ancho'],['sobresale','Sobresale del muro']]},
-  contacto:{n:'Contacto',f:'punto',lado:1,c:[['altura','Altura']],def:{altura:300}},
-  apagador:{n:'Apagador',f:'punto',lado:1,c:[['altura','Altura']],def:{altura:1200}}};
-const DE_FORMA={linea:['muro'],caja:['puerta','ventana','trabe','escalon','columna'],punto:['contacto','apagador']};
-const IC={inst:'<svg viewBox="0 0 24 24" width="20" height="20"><rect x="5" y="3" width="14" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9.5" cy="10" r="1.4" fill="currentColor"/><circle cx="14.5" cy="10" r="1.4" fill="currentColor"/><path d="M10 15h4" stroke="currentColor" stroke-width="2"/></svg>',
+  marco:{n:'Marco del muro',f:'marco',c:[]},
+  puerta:{n:'Puerta',f:'caja',c:[['ancho','Ancho'],['alto','Alto']],def:{ancho:900,alto:2100},piso:1},
+  ventana:{n:'Ventana',f:'caja',c:[['ancho','Ancho'],['alto','Alto']],def:{ancho:1200,alto:1200}},
+  columna:{n:'Columna',f:'caja',c:[['ancho','Ancho'],['sobresale','Sobresale del muro']],completa:1},
+  trabe:{n:'Trabe',f:'caja',c:[['ancho','Ancho'],['alto','Peralte'],['sobresale','Sobresale del muro']],techo:1},
+  escalon:{n:'Escalón',f:'caja',c:[['ancho','Ancho'],['alto','Alto'],['sobresale','Sobresale del muro']],piso:1},
+  contacto:{n:'Contacto',f:'punto',c:[],regla:'al centro de la placa'},
+  apagador:{n:'Apagador',f:'punto',c:[],regla:'al centro de la placa'},
+  toma:{n:'Toma de agua',f:'punto',c:[],regla:'al centro de la salida'},
+  caja:{n:'Caja de registro',f:'punto',c:[],regla:'en su esquina derecha'},
+  cota:{n:'Cota',f:'cota',c:[]}};
+const IC={marco:'<svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 7V3h4M17 3h4v4M21 17v4h-4M7 21H3v-4" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
  puerta:'<svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 21V3h12v18M3 21h18" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="15" cy="12" r="1.3" fill="currentColor"/></svg>',
  ventana:'<svg viewBox="0 0 24 24" width="20" height="20"><rect x="4" y="5" width="16" height="13" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 5v13M4 11.5h16" stroke="currentColor" stroke-width="2"/></svg>',
- estr:'<svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 5h18v4H3zM8 9v12M16 9v12" fill="none" stroke="currentColor" stroke-width="2"/></svg>'};
-const HERR={inst:{n:'Instalación',f:'punto',t:['contacto','apagador'],h:'Toca donde está el contacto o apagador.'},
+ inst:'<svg viewBox="0 0 24 24" width="20" height="20"><rect x="5" y="3" width="14" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9.5" cy="10" r="1.4" fill="currentColor"/><circle cx="14.5" cy="10" r="1.4" fill="currentColor"/><path d="M10 15h4" stroke="currentColor" stroke-width="2"/></svg>',
+ estr:'<svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 5h18v4H3zM8 9v12M16 9v12" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+ cota:'<svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 12h18M3 8v8M21 8v8M7 10l-4 2 4 2M17 10l4 2-4 2" fill="none" stroke="currentColor" stroke-width="2"/></svg>'};
+const HERR={marco:{n:'Marco',f:'marco',t:['marco'],h:'Arrastra de una esquina del muro a la contraria: es la guía de dónde a dónde se mide.'},
   puerta:{n:'Puerta',f:'caja',t:['puerta'],h:'Arrastra sobre la puerta, de una esquina a la otra.'},
   ventana:{n:'Ventana',f:'caja',t:['ventana'],h:'Arrastra sobre la ventana.'},
-  estr:{n:'Estructura',f:'caja',t:['columna','trabe','escalon'],h:'Arrastra sobre la columna, trabe o escalón.'}};
-const OPC={muro:['muro'],contacto:['contacto','apagador'],apagador:['contacto','apagador'],puerta:['puerta'],ventana:['ventana'],columna:['columna','trabe','escalon'],trabe:['columna','trabe','escalon'],escalon:['columna','trabe','escalon']};
+  inst:{n:'Instalación',f:'punto',t:['contacto','apagador','toma','caja'],h:'Toca el centro del contacto, apagador o toma de agua (las cajas, en su esquina derecha).'},
+  estr:{n:'Estructura',f:'caja',t:['columna','trabe','escalon'],h:'Arrastra sobre la columna, trabe o escalón.'},
+  cota:{n:'Cota',f:'cota',t:['cota'],h:'Arrastra de una orilla a otra (del marco, una puerta, un contacto…). Se pega sola a los puntos guía.'}};
+const OPC={contacto:['contacto','apagador','toma','caja'],apagador:['contacto','apagador','toma','caja'],toma:['contacto','apagador','toma','caja'],caja:['contacto','apagador','toma','caja'],puerta:['puerta'],ventana:['ventana'],columna:['columna','trabe','escalon'],trabe:['columna','trabe','escalon'],escalon:['columna','trabe','escalon'],marco:['marco'],cota:['cota']};
 let HIST=[];const snap=()=>{const f=M().foto;if(f){HIST.push(JSON.stringify(f.marcas));if(HIST.length>40)HIST.shift()}};
-const COL={muro:'#c6f000',puerta:'#ff8a00',ventana:'#2fb6ff',trabe:'#c38bff',escalon:'#c38bff',columna:'#c38bff',contacto:'#4fc3f7',apagador:'#c8371e'};
+const COL={marco:'#ffffff',puerta:'#ff8a00',ventana:'#2fb6ff',trabe:'#c38bff',escalon:'#c38bff',columna:'#c38bff',contacto:'#4fc3f7',apagador:'#ff5a3c',toma:'#00e0b0',caja:'#ffd400',cota:'#c6f000'};
+const uid=()=>Math.random().toString(36).slice(2,9);
 
 /* ---------- planta generada: largo y esquina de cada muro ---------- */
 function planta(es){
@@ -152,17 +159,60 @@ function inicio(){
   $('bCargar').onclick=()=>$('fCargar').click();
   $('bar').innerHTML=`<button class="a" id="bEnv">Enviar</button>`;$('bEnv').onclick=enviar;
 }
+/* ---------- posiciones: cada cota une dos orillas; se resuelve horizontal y vertical por separado ---------- */
+function resuelve(w){
+  const ms=w.foto?w.foto.marcas:[],marco=ms.find(m=>m.tipo==='marco');
+  const mk=()=>{const par={},off={};const find=n=>{if(!(n in par)){par[n]=n;off[n]=0}if(par[n]===n)return[n,0];const [r,o]=find(par[n]);par[n]=r;off[n]+=o;return[r,off[n]]};
+    const conf=[];const une=(a,b,d,q)=>{const [ra,oa]=find(a),[rb,ob]=find(b);if(ra===rb){if(Math.abs(ob-oa-d)>20)conf.push(q);return}par[rb]=ra;off[rb]=oa+d-ob};
+    return{find,une,conf}};
+  const X=mk(),Y=mk(),mid=marco?marco.id:null;
+  ms.forEach(m=>{const t=TIPOS[m.tipo],d=m.datos||{};if(!t)return;
+    if(m.tipo==='marco'){if(w.largo)X.une(m.id+':l',m.id+':r',w.largo);if(w.altura)Y.une(m.id+':b',m.id+':t',w.altura)}
+    else if(t.f==='caja'){if(d.ancho)X.une(m.id+':l',m.id+':r',d.ancho);
+      if(mid){if(t.piso)Y.une(mid+':b',m.id+':b',0);if(t.techo)Y.une(mid+':t',m.id+':t',0);if(t.completa){Y.une(mid+':b',m.id+':b',0);Y.une(mid+':t',m.id+':t',0)}}
+      if(d.alto&&!t.completa){if(t.techo)Y.une(m.id+':t',m.id+':b',-d.alto);else Y.une(m.id+':b',m.id+':t',d.alto)}}});
+  ms.filter(m=>m.tipo==='cota'&&m.datos.a&&m.datos.b&&m.datos.valor).forEach(m=>{const d=m.datos,S=d.eje==='h'?X:Y;
+    const pa=coordFoto(ms,d.a,d.eje),pb=coordFoto(ms,d.b,d.eje);if(pa==null||pb==null)return;
+    const sg=d.eje==='h'?(pb>=pa?1:-1):(pb<=pa?1:-1);S.une(d.a.id+':'+d.a.ref,d.b.id+':'+d.b.ref,sg*d.valor,m.id)});
+  const val=(S,n,anc)=>{if(!anc)return null;const [r,o]=S.find(n),[ra,oa]=S.find(anc);return r===ra?o-oa:null};
+  const ax=mid?mid+':l':null,ay=mid?mid+':b':null,pos={};
+  ms.forEach(m=>{if(m.tipo==='cota')return;const t=TIPOS[m.tipo];if(!t)return;
+    if(t.f==='punto')pos[m.id]={cx:val(X,m.id+':c',ax),cy:val(Y,m.id+':c',ay)};
+    else pos[m.id]={l:val(X,m.id+':l',ax),r:val(X,m.id+':r',ax),b:val(Y,m.id+':b',ay),t:val(Y,m.id+':t',ay)}});
+  return{pos,conf:[...X.conf,...Y.conf],marco:!!marco}
+}
+/* coordenada en la foto (0–1) de un nodo: orilla l/r/b/t de una caja o marco, c de un punto */
+function coordFoto(ms,nd,eje){const m=ms.find(q=>q.id===nd.id);if(!m)return null;
+  if(m.forma==='punto')return eje==='h'?m.p[0]:m.p[1];const x1=Math.min(m.p[0],m.p[2]),x2=Math.max(m.p[0],m.p[2]),y1=Math.min(m.p[1],m.p[3]),y2=Math.max(m.p[1],m.p[3]);
+  return{l:x1,r:x2,t:y1,b:y2}[nd.ref]}
+function nombreN(ms,m){const t=TIPOS[m.tipo];if(m.tipo==='marco')return'Marco';return t.n.split(' ')[0]+' '+(ms.filter(q=>q.tipo===m.tipo).indexOf(m)+1)}
+const REFN={l:'orilla izq.',r:'orilla der.',b:'abajo',t:'arriba',c:'centro'};
 function problemas(es,w){const r=[],A=w.altura,L=w.largo;
   if(L&&L>15000)r.push({t:`El ancho de ${cm(L)} cm parece mucho.`,k:'largo',v:Math.round(L/10)});
   if(A&&A>5000)r.push({t:`El alto de ${cm(A)} cm parece mucho.`,k:'altura',v:Math.round(A/10)});
   if(A&&A<1500)r.push({t:`El alto de ${cm(A)} cm parece poco.`});
-  elems(w).forEach(e=>{const n=TIPOS[e.tipo].n;
-    if(L&&e.x!=null&&(e.x<0||e.x+(e.ancho||0)>L+5))r.push({t:`${n}: se sale del muro (revisa distancia y ancho).`});
-    const top=(e.antepecho||0)+(e.alto||0);if(A&&(e.tipo==='puerta'||e.tipo==='ventana')&&top>A+5)r.push({t:`${n}: llega más alto que el muro.`});
-    if(A&&e.altura&&e.altura>A)r.push({t:`${n}: su altura pasa el alto del muro.`})});
+  if(!w.foto)return r;const ms=w.foto.marcas,R=resuelve(w);
+  if(ms.some(m=>m.tipo!=='marco'&&m.tipo!=='cota')&&!R.marco)r.push({t:'Falta el marco del muro: es la referencia para ubicar todo.'});
+  ms.forEach(m=>{const t=TIPOS[m.tipo];if(!t||m.tipo==='marco'||m.tipo==='cota')return;const n=nombreN(ms,m),p=R.pos[m.id]||{},d=m.datos||{},f=[];
+    t.c.forEach(([k,l])=>{if(d[k]==null)f.push(l.toLowerCase())});
+    if(R.marco){if(t.f==='punto'){if(p.cx==null)f.push('cota horizontal');if(p.cy==null)f.push('cota de altura')}
+      else{if(p.l==null)f.push('cota horizontal que la ubique');if(!t.completa&&p.b==null)f.push(m.tipo==='ventana'?'cota del antepecho':'cota vertical')}}
+    if(f.length)r.push({t:`${n}: falta ${f.join(', ')}.`});
+    if(L&&p.l!=null&&(p.l<-5||p.r>L+5))r.push({t:`${n}: se sale del muro, revisa sus cotas.`});
+    if(A&&p.t!=null&&p.t>A+5)r.push({t:`${n}: queda más alto que el muro.`})});
+  if(R.conf.length)r.push({t:`Hay ${R.conf.length} cota(s) que no cuadran con las demás (más de 2 cm de diferencia). Revisa las medidas.`});
   return r}
-function elems(w){return(w.foto?w.foto.marcas:[]).filter(m=>m.tipo!=='muro').map(m=>{const d=m.datos,t=TIPOS[m.tipo],an=d.ancho||0;
-  let x=d.dist;if(x!=null&&d.lado==='der'&&w.largo)x=w.largo-x-(t.f==='caja'?an:0);const o={tipo:m.tipo,lado:d.lado,dist:d.dist,x};t.c.forEach(([k])=>o[k]=d[k]??null);return o})}
+function elems(w){if(!w.foto)return[];const ms=w.foto.marcas,R=resuelve(w),L=w.largo;
+  return ms.filter(m=>m.tipo!=='marco'&&m.tipo!=='cota'&&TIPOS[m.tipo]).map(m=>{const t=TIPOS[m.tipo],d=m.datos||{},p=R.pos[m.id]||{};
+    if(t.f==='punto'){const x=p.cx,lado=x!=null&&L&&x>L/2?'der':'izq';return{tipo:m.tipo,x,altura:p.cy,lado,dist:x==null?null:(lado==='der'?L-x:x)}}
+    const x=p.l,an=d.ancho??(p.r!=null&&p.l!=null?p.r-p.l:null),lado=x!=null&&L&&an!=null&&x+an/2>L/2?'der':'izq';
+    const o={tipo:m.tipo,x,ancho:an,lado,dist:x==null?null:(lado==='der'?L-x-(an||0):x)};
+    if(m.tipo==='puerta')o.alto=d.alto??(p.t!=null&&p.b!=null?p.t-p.b:null);
+    if(m.tipo==='ventana'){o.alto=d.alto??(p.t!=null&&p.b!=null?p.t-p.b:null);o.antepecho=p.b}
+    if(m.tipo==='trabe'){o.peralte=d.alto;o.alto=d.alto;o.sobresale=d.sobresale}
+    if(m.tipo==='escalon'){o.alto=d.alto;o.sobresale=d.sobresale}
+    if(m.tipo==='columna')o.sobresale=d.sobresale;
+    return o})}
 const nuevoMuro=(alto=null)=>({largo:null,altura:alto,zoclo:0,esquina:'rincon',angulo:90,foto:null});
 function muroHtml(es,w,i){
   const n=es.muros.length,act=i===V.m,f=w.foto,pr=problemas(es,w);
@@ -172,7 +222,7 @@ function muroHtml(es,w,i){
   ${f?`<div class="foto" style="margin-top:8px"><canvas id="cv${i}" data-w="${i}"></canvas><button class="s" data-z1="${i}" style="position:absolute;top:8px;right:8px;display:none;min-height:36px;z-index:2">Ajustar</button></div>
    <p class="hint" style="margin:4px 2px 0">Pellizca la foto con dos dedos para acercar.</p>
    <div class="tools" style="grid-template-columns:repeat(3,minmax(0,1fr))">${Object.entries(HERR).map(([k,h])=>`<button class="${act&&herr===k?'on':'s'}" data-h="${k}" data-w="${i}" style="display:flex;gap:6px;align-items:center;justify-content:center">${IC[k]}${h.n}</button>`).join('')}<button class="s" data-des="${i}" ${act&&HIST.length?'':'disabled'}>↶ Deshacer</button></div>
-   ${act?`<p class="hint">${herr==='sel'?'Elige qué vas a marcar, o toca una marca para ver sus medidas.':HERR[herr].h}</p>`:''}`
+   ${act?`<p class="hint">${herr==='sel'?(f.marcas.some(m=>m.tipo==='marco')?'Marca puertas, ventanas, instalaciones o estructura, y amárralas con cotas. Toca una marca para ver sus medidas.':'Empieza con <b>Marco</b>: enmarca el muro de orilla a orilla.'):HERR[herr].h}</p>`:''}`
    :`<button class="vacio" data-tf="${i}" style="width:100%;margin-top:8px"><div><b style="font-size:18px">Tomar foto del muro ${i+1}</b><br><span class="hint">Párate frente al muro, de preferencia con el teléfono horizontal</span></div></button>`}
   <div id="ed${i}"></div>
   <div class="g3"><div><label for="wL${i}">Ancho (cm)</label><input id="wL${i}" data-w="${i}" data-k="largo" inputmode="decimal" value="${cm(w.largo)}"></div>
@@ -226,23 +276,37 @@ function preparaFoto(i){const f=E().muros[i].foto,im=new Image();IMGS[i]=im;im.o
 function pinta(i=V.m){
   const c=$('cv'+i),im=IMGS[i];if(!c||!im||!im.complete)return;
   c.width=im.width;c.height=im.height;const x=c.getContext('2d');x.drawImage(im,0,0);
-  const w=E().muros[i];dibujaMarcas(x,w.foto.marcas,c.width,c.height,i===V.m?sel:-1,1,m=>etiquetaDe(w,m,E()));
+  const w=E().muros[i];dibujaMarcas(x,w,c.width,c.height,i===V.m?sel:-1,i===V.m&&herr==='cota');
 }
-function etiquetaDe(w,m,es){const t=TIPOS[m.tipo],d=m.datos||{};if(!t)return'?';
-  if(m.tipo==='muro')return d.eje==='v'?'Alto '+(cm(w.altura)||'?'):'Ancho '+(cm(w.largo)||'?');
-  const k=w.foto.marcas.filter(q=>q.tipo===m.tipo).indexOf(m)+1;
-  return`${t.n.split(' ')[0]} ${k} ${t.c.map(([q])=>cm(d[q])||'?').join('×')}${t.lado&&d.dist!=null?` · ${d.lado==='der'?'der':'izq'} ${cm(d.dist)}`:''}`}
-function dibujaMarcas(x,marcas,W,H,s,esc1,etiq){
-  const lw=Math.max(3,W/260),fs=Math.max(16,W/40);x.font=`700 ${fs}px sans-serif`;x.lineCap='round';
-  marcas.forEach((m,i)=>{const c=COL[m.tipo]||'#fff',p=m.p.map((v,k)=>v*(k%2?H:W)),on=i===s;x.strokeStyle=c;x.fillStyle=c;x.lineWidth=on?lw*2:lw;
-    let tx,ty;
-    if(m.forma==='linea'){x.beginPath();x.moveTo(p[0],p[1]);x.lineTo(p[2],p[3]);x.stroke();
-      const a=Math.atan2(p[3]-p[1],p[2]-p[0]),q=lw*4;[[p[0],p[1]],[p[2],p[3]]].forEach(([u,v])=>{x.beginPath();x.moveTo(u-q*Math.sin(a),v+q*Math.cos(a));x.lineTo(u+q*Math.sin(a),v-q*Math.cos(a));x.stroke()});
-      tx=(p[0]+p[2])/2+lw*2;ty=(p[1]+p[3])/2-lw*3}
-    else if(m.forma==='caja'){const bx=Math.min(p[0],p[2]),by=Math.min(p[1],p[3]),bw=Math.abs(p[2]-p[0]),bh=Math.abs(p[3]-p[1]);x.strokeRect(bx,by,bw,bh);if(on){x.globalAlpha=.18;x.fillRect(bx,by,bw,bh);x.globalAlpha=1}tx=bx;ty=by-lw*2}
-    else{x.beginPath();x.arc(p[0],p[1],lw*3.5,0,7);x.fill();tx=p[0]+lw*5;ty=p[1]+fs/3}
-    const t=etiq?etiq(m):'';if(!t)return;const tw=x.measureText(t).width;tx=Math.max(4,Math.min(tx,W-tw-8));ty=Math.max(fs+4,ty);
-    x.fillStyle='rgba(0,0,0,.72)';x.fillRect(tx-4,ty-fs,tw+8,fs*1.25);x.fillStyle=c;x.fillText(t,tx,ty)});
+function etiquetaDe(w,m){const t=TIPOS[m.tipo],d=m.datos||{},ms=w.foto.marcas;if(!t)return'';
+  if(m.tipo==='marco')return`Muro ${cm(w.largo)||'?'} × ${cm(w.altura)||'?'}`;
+  if(m.tipo==='cota')return(d.valor!=null?cm(d.valor):'?')+(d.nota?' '+d.nota:'');
+  const n=nombreN(ms,m),med=t.c.filter(([k])=>k!=='sobresale').map(([k])=>cm(d[k])||'?').join('×');return med?`${n} ${med}`:n}
+function nodos(ms){const out=[];ms.forEach(m=>{if(m.tipo==='cota')return;
+  if(m.forma==='punto')out.push({id:m.id,ref:'c',x:m.p[0],y:m.p[1],x1:m.p[0]-.04,x2:m.p[0]+.04,y1:m.p[1]-.04,y2:m.p[1]+.04});
+  else{const x1=Math.min(m.p[0],m.p[2]),x2=Math.max(m.p[0],m.p[2]),y1=Math.min(m.p[1],m.p[3]),y2=Math.max(m.p[1],m.p[3]);
+    out.push({id:m.id,ref:'l',x:x1,y:(y1+y2)/2,v:1,y1,y2},{id:m.id,ref:'r',x:x2,y:(y1+y2)/2,v:1,y1,y2},{id:m.id,ref:'t',x:(x1+x2)/2,y:y1,h:1,x1,x2},{id:m.id,ref:'b',x:(x1+x2)/2,y:y2,h:1,x1,x2})}});return out}
+function pega(ms,p,eje){let best=null,bd=.06;nodos(ms).forEach(n=>{let d;
+    if(eje==='h'){if(n.h)return;const fuera=Math.max(0,(n.y1??n.y)-.08-p[1],p[1]-(n.y2??n.y)-.08);d=Math.abs(p[0]-n.x)+fuera}
+    else{if(n.v)return;const fuera=Math.max(0,(n.x1??n.x)-.08-p[0],p[0]-(n.x2??n.x)-.08);d=Math.abs(p[1]-n.y)+fuera}
+    if(d<bd){bd=d;best=n}});return best}
+function dibujaMarcas(x,w,W,H,s,guias){
+  const ms=w.foto.marcas,lw=Math.max(3,W/260),fs=Math.max(16,W/40);x.font=`700 ${fs}px sans-serif`;x.lineCap='round';
+  const rot=(t,tx,ty,c)=>{const tw=x.measureText(t).width;tx=Math.max(4,Math.min(tx,W-tw-8));ty=Math.max(fs+4,Math.min(ty,H-6));x.fillStyle='rgba(0,0,0,.72)';x.fillRect(tx-4,ty-fs,tw+8,fs*1.25);x.fillStyle=c;x.fillText(t,tx,ty)};
+  ms.forEach((m,i)=>{const c=COL[m.tipo]||'#fff',on=i===s;x.strokeStyle=c;x.fillStyle=c;x.lineWidth=on?lw*2:lw;x.setLineDash([]);
+    if(m.forma==='cota')return;const p=m.p.map((v,k)=>v*(k%2?H:W));
+    if(m.forma==='marco'||m.forma==='caja'){const bx=Math.min(p[0],p[2]),by=Math.min(p[1],p[3]),bw=Math.abs(p[2]-p[0]),bh=Math.abs(p[3]-p[1]);
+      if(m.forma==='marco')x.setLineDash([lw*4,lw*3]);x.strokeRect(bx,by,bw,bh);x.setLineDash([]);if(on){x.globalAlpha=.15;x.fillRect(bx,by,bw,bh);x.globalAlpha=1}
+      rot(etiquetaDe(w,m),bx+lw,m.forma==='marco'?by+bh-lw*2:by-lw*2,c)}
+    else{x.beginPath();x.arc(p[0],p[1],lw*3.5,0,7);x.fill();rot(etiquetaDe(w,m),p[0]+lw*5,p[1]-lw*3,c)}});
+  ms.forEach((m,i)=>{if(m.forma!=='cota')return;const d=m.datos,c=COL.cota,on=i===s,p=m.p.map((v,k)=>v*(k%2?H:W));x.strokeStyle=c;x.lineWidth=on?lw*1.6:lw*.9;
+    let a=[p[0],p[1]],b=[p[2],p[3]];
+    if(d.a&&d.b){const ca=coordFoto(ms,d.a,d.eje),cb=coordFoto(ms,d.b,d.eje);if(ca!=null&&cb!=null){if(d.eje==='h'){const y=(p[1]+p[3])/2;a=[ca*W,y];b=[cb*W,y]}else{const xx=(p[0]+p[2])/2;a=[xx,ca*H];b=[xx,cb*H]}}}
+    x.beginPath();x.moveTo(a[0],a[1]);x.lineTo(b[0],b[1]);x.stroke();const ang=Math.atan2(b[1]-a[1],b[0]-a[0]),q=lw*3;
+    [a,b].forEach(([u,v])=>{x.beginPath();x.moveTo(u-q*Math.sin(ang),v+q*Math.cos(ang));x.lineTo(u+q*Math.sin(ang),v-q*Math.cos(ang));x.stroke()});
+    if(!(d.a&&d.b)){x.setLineDash([lw,lw*2]);x.strokeRect(a[0]-lw*2,a[1]-lw*2,lw*4,lw*4);x.setLineDash([])}
+    rot(etiquetaDe(w,m),(a[0]+b[0])/2+lw*2,(a[1]+b[1])/2-lw*2,c)});
+  if(guias){x.fillStyle='#c6f000';nodos(ms).forEach(n=>{x.beginPath();x.arc(n.x*W,n.y*H,lw*1.8,0,7);x.fill()})}
 }
 const Z={};
 function aplicaZoom(i){const c=$('cv'+i),z=Z[i];if(!c)return;if(!z||z.s<=1.01){c.style.transform='';Z[i]={s:1,x:0,y:0};const b=document.querySelector(`[data-z1="${i}"]`);if(b)b.style.display='none';return}
@@ -258,40 +322,49 @@ function eventos(i){
   c.onpointerdown=ev=>{if(dedos.size>1)return;const p=pos(ev);
     if(V.m!==i){V.m=i;sel=-1;herr='sel';HIST=[];render(true);return}
     if(herr==='sel'){sel=busca(p);pinta(i);editor();return}
-    c.setPointerCapture(ev.pointerId);
-    const H=HERR[herr];if(H.f==='punto'){agrega({forma:'punto',p:[p[0],p[1]]},H.t[0]);return}
-    ini=p;tmp={forma:H.f,p:[p[0],p[1],p[0],p[1]],tipo:H.t[0]}};
-  c.onpointermove=ev=>{if(!ini||dedos.size>1)return;const p=pos(ev);tmp.p=[ini[0],ini[1],p[0],p[1]];pinta(i);dibujaMarcas(c.getContext('2d'),[tmp],c.width,c.height,0,1,null)};
+    c.setPointerCapture(ev.pointerId);const H=HERR[herr];
+    if(H.f==='punto'){agrega({forma:'punto',p:[p[0],p[1]]},H.t[0]);return}
+    ini=p;tmp={forma:H.f,p:[p[0],p[1],p[0],p[1]],tipo:H.t[0],datos:{}}};
+  c.onpointermove=ev=>{if(!ini||dedos.size>1)return;const p=pos(ev);tmp.p=[ini[0],ini[1],p[0],p[1]];pinta(i);const x=c.getContext('2d'),w=E().muros[i];
+    dibujaMarcas(x,{...w,foto:{...w.foto,marcas:[...w.foto.marcas,tmp]}},c.width,c.height,w.foto.marcas.length,herr==='cota')};
   c.onpointerup=ev=>{if(!ini||pinch)return;const p=pos(ev),q=ini,f=tmp.forma,t=tmp.tipo;ini=null;tmp=null;if(Math.hypot(p[0]-q[0],p[1]-q[1])<.03){pinta(i);return}agrega({forma:f,p:[q[0],q[1],p[0],p[1]]},t)};
 }
-function busca(p){const ms=M().foto.marcas;let best=-1,bd=.06;
+function busca(p){const ms=M().foto.marcas;let best=-1,bd=.05;
   ms.forEach((m,i)=>{let d;if(m.forma==='punto')d=Math.hypot(p[0]-m.p[0],p[1]-m.p[1]);
-    else if(m.forma==='caja'){const [a,b,c2,d2]=m.p,inx=p[0]>=Math.min(a,c2)&&p[0]<=Math.max(a,c2),iny=p[1]>=Math.min(b,d2)&&p[1]<=Math.max(b,d2);d=inx&&iny?.02:1}
-    else{const [x1,y1,x2,y2]=m.p,L=Math.hypot(x2-x1,y2-y1)||1e-6,t=Math.max(0,Math.min(1,((p[0]-x1)*(x2-x1)+(p[1]-y1)*(y2-y1))/L/L));d=Math.hypot(p[0]-(x1+t*(x2-x1)),p[1]-(y1+t*(y2-y1)))}
+    else if(m.forma==='caja'||m.forma==='marco'){const [a,b,c2,d2]=m.p,x1=Math.min(a,c2),x2=Math.max(a,c2),y1=Math.min(b,d2),y2=Math.max(b,d2),dentro=p[0]>=x1&&p[0]<=x2&&p[1]>=y1&&p[1]<=y2;
+      d=m.forma==='marco'?(dentro?.045:1):(dentro?.02:1)}
+    else{const [x1,y1,x2,y2]=m.p,L=Math.hypot(x2-x1,y2-y1)||1e-6,t=Math.max(0,Math.min(1,((p[0]-x1)*(x2-x1)+(p[1]-y1)*(y2-y1))/L/L));d=Math.hypot(p[0]-(x1+t*(x2-x1)),p[1]-(y1+t*(y2-y1)))*.8}
     if(d<bd){bd=d;best=i}});return best}
-function agrega(m,tipo){snap();const t=TIPOS[tipo];m.tipo=tipo;m.datos=Object.assign({lado:'izq',dist:null},t.def||{});
-  if(m.forma==='linea'){const im=IMGS[V.m]||{width:1,height:1},dx=(m.p[2]-m.p[0])*im.width,dy=(m.p[3]-m.p[1])*im.height;m.datos={eje:Math.abs(dx)>=Math.abs(dy)?'h':'v'}}
-  const ms=M().foto.marcas;ms.push(m);sel=ms.length-1;herr='sel';guardar();render(true)}
+function agrega(m,tipo){const w=M(),ms=w.foto.marcas,t=TIPOS[tipo];
+  if(tipo==='marco'&&ms.some(q=>q.tipo==='marco')){aviso('Este muro ya tiene marco: tócalo para cambiarlo o bórralo primero');herr='sel';render(true);return}
+  snap();m.id=uid();m.tipo=tipo;m.datos=Object.assign({},t.def||{});
+  if(m.forma==='cota'){const im=IMGS[V.m]||{width:1,height:1},dx=(m.p[2]-m.p[0])*im.width,dy=(m.p[3]-m.p[1])*im.height,eje=Math.abs(dx)>=Math.abs(dy)?'h':'v';
+    const a=pega(ms,[m.p[0],m.p[1]],eje),b=pega(ms,[m.p[2],m.p[3]],eje);m.datos={eje,a:a?{id:a.id,ref:a.ref}:null,b:b?{id:b.id,ref:b.ref}:null,valor:null,nota:''};
+    if(a&&b&&a.id===b.id&&a.ref===b.ref)m.datos.b=null}
+  ms.push(m);sel=ms.length-1;herr='sel';guardar();render(true)}
 function editor(){
   const ed=$('ed'+V.m);if(!ed)return;const es=E(),w=M(),f=w.foto;if(!f||sel<0||!f.marcas[sel]){ed.innerHTML='';return}
-  const m=f.marcas[sel],t=TIPOS[m.tipo],d=m.datos;
-  let campos;
-  if(m.tipo==='muro'){const k=d.eje==='v'?'altura':'largo';campos=`<div><label for="mV_${k}">${d.eje==='v'?'Alto del muro':'Ancho del muro'} (cm)</label><input id="mV_${k}" inputmode="decimal" value="${cm(w[k])}"></div>`}
-  else campos=(t.lado?`<div><label for="mV_dist">Distancia a esa esquina</label><input id="mV_dist" inputmode="decimal" value="${cm(d.dist)}"></div>`:'')+t.c.map(([k,l])=>`<div><label for="mV_${k}">${l}</label><input id="mV_${k}" inputmode="decimal" value="${cm(d[k])}"></div>`).join('');
-  ed.innerHTML=`<div class="pn" style="background:var(--bg)"><div class="g2"><div><label for="mT">Qué es</label><select id="mT">${(OPC[m.tipo]||[m.tipo]).map(k=>`<option value="${k}" ${k===m.tipo?'selected':''}>${TIPOS[k].n}</option>`).join('')}</select></div>
-    ${t.lado?`<div><label for="mL">Esquina más cercana</label><select id="mL"><option value="izq" ${d.lado!=='der'?'selected':''}>Izquierda</option><option value="der" ${d.lado==='der'?'selected':''}>Derecha</option></select></div>`:m.tipo==='muro'?`<div><label for="mE">Medida</label><select id="mE"><option value="h" ${d.eje!=='v'?'selected':''}>Horizontal (ancho)</option><option value="v" ${d.eje==='v'?'selected':''}>Vertical (alto)</option></select></div>`:'<div></div>'}</div>
-    <div class="g3">${campos}</div>
-    <div class="row" style="margin-top:10px;justify-content:space-between"><span class="hint">Medidas en cm</span><button class="s" id="mX">Borrar marca</button></div></div>`;
-  $('mT').onchange=ev=>{snap();m.tipo=ev.target.value;m.datos=Object.assign({lado:d.lado||'izq',dist:d.dist??null},TIPOS[m.tipo].def||{});guardar();pinta();editor()};
-  if($('mL'))$('mL').onchange=ev=>{snap();d.lado=ev.target.value;guardar();pinta()};
-  if($('mE'))$('mE').onchange=ev=>{snap();d.eje=ev.target.value;guardar();pinta();editor()};
+  const ms=f.marcas,m=ms[sel],t=TIPOS[m.tipo],d=m.datos,R=resuelve(w),p=R.pos[m.id]||{};let cuerpo='';
+  if(m.tipo==='marco')cuerpo=`<div class="g2"><div><label for="mV_largo">Ancho del muro (cm)</label><input id="mV_largo" inputmode="decimal" value="${cm(w.largo)}"></div><div><label for="mV_altura">Alto del muro (cm)</label><input id="mV_altura" inputmode="decimal" value="${cm(w.altura)}"></div></div>`;
+  else if(m.tipo==='cota'){const q=n=>{if(!n)return'sin pegar (cota libre)';const mm2=ms.find(x=>x.id===n.id);return mm2?`${nombreN(ms,mm2)} · ${REFN[n.ref]}`:'—'};
+    cuerpo=`<p class="hint" style="margin-top:0">${d.eje==='h'?'Horizontal':'Vertical'}: ${esc(q(d.a))} → ${esc(q(d.b))}${d.a&&d.b?'':'. Solo se muestra en la foto y el PDF.'}</p>
+     <div class="g2"><div><label for="mV_valor">Medida (cm)</label><input id="mV_valor" inputmode="decimal" value="${cm(d.valor)}"></div><div><label for="mN">Nota (opcional)</label><input id="mN" value="${esc(d.nota)}"></div></div>`}
+  else{const est=t.f==='punto'?(p.cx!=null&&p.cy!=null):(p.l!=null&&(t.completa||p.b!=null));
+    cuerpo=`<div class="g2"><div><label for="mT">Qué es</label><select id="mT">${(OPC[m.tipo]||[m.tipo]).map(k=>`<option value="${k}" ${k===m.tipo?'selected':''}>${TIPOS[k].n}</option>`).join('')}</select></div>
+      <div><label>Ubicación</label><p class="${est?'okt':'warn'}" style="margin:10px 0 0">${est?'✓ Amarrada con cotas':'Falta amarrarla con cotas'}</p></div></div>
+     ${t.c.length?`<div class="g3">${t.c.map(([k,l])=>`<div><label for="mV_${k}">${l}</label><input id="mV_${k}" inputmode="decimal" value="${cm(d[k])}"></div>`).join('')}</div>`:''}
+     <p class="hint">${t.regla?`Se mide ${t.regla}. `:''}${t.f==='punto'?'Pon una cota horizontal hacia una orilla y otra vertical hacia el piso o el techo.':t.completa?'Pon una cota horizontal desde una orilla del marco u otro elemento.':m.tipo==='ventana'?'Pon una cota horizontal que la ubique y una vertical del antepecho al piso.':t.techo?'Pon una cota horizontal que la ubique; se asume pegada al techo.':'Pon una cota horizontal que la ubique; se asume sobre el piso.'}</p>`}
+  ed.innerHTML=`<div class="pn" style="background:var(--bg)"><b>${esc(t.f==='cota'?'Cota':nombreN(ms,m))}</b>${cuerpo}
+    <div class="row" style="margin-top:10px;justify-content:space-between"><span class="hint">Medidas en cm</span><button class="s" id="mX">Borrar</button></div></div>`;
+  if($('mT'))$('mT').onchange=ev=>{snap();m.tipo=ev.target.value;guardar();pinta();editor()};
+  if($('mN'))$('mN').onchange=ev=>{snap();d.nota=ev.target.value;guardar();pinta()};
   ed.querySelectorAll('input[id^="mV_"]').forEach(inp=>inp.onchange=ev=>{snap();const k=inp.id.slice(3),v=mm(ev.target.value);if(k==='largo'||k==='altura')w[k]=v;else d[k]=v;guardar();render(true)});
-  $('mX').onclick=()=>{snap();f.marcas.splice(sel,1);sel=-1;guardar();render(true)};
+  $('mX').onclick=()=>{snap();const id=m.id;f.marcas.splice(sel,1);f.marcas.forEach(q=>{if(q.tipo==='cota'){if(q.datos.a&&q.datos.a.id===id)q.datos.a=null;if(q.datos.b&&q.datos.b.id===id)q.datos.b=null}});sel=-1;guardar();render(true)};
 }
 
 /* ---------- fotos ---------- */
 function comprime(file,max=1600){return new Promise((ok,mal)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{const r=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*r);c.height=Math.round(im.height*r);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL('image/jpeg',.72))};im.onerror=mal;im.src=u})}
-$('fFoto').onchange=async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;try{const img=await comprime(f,1280);const w=M();w.foto={img,marcas:w.foto?w.foto.marcas:[]};herr='sel';guardar();render(true);aviso('Marca puertas, ventanas, instalaciones o estructura sobre la foto')}catch(e){aviso('No se pudo leer la foto')}};
+$('fFoto').onchange=async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;try{const img=await comprime(f,1280);const w=M();w.foto={img,marcas:w.foto?w.foto.marcas:[]};herr=w.foto.marcas.some(m=>m.tipo==='marco')?'sel':'marco';guardar();render(true);aviso('Enmarca el muro de orilla a orilla')}catch(e){aviso('No se pudo leer la foto')}};
 $('fFotos').onchange=async ev=>{const es=E();for(const f of ev.target.files){try{es.fotos.push({img:await comprime(f,1280)})}catch(e){}}ev.target.value='';guardar();render(true)};
 $('fCargar').onchange=async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;try{const d=JSON.parse(await f.text());if(d.formato!=='NODO-ESPACIO'||d.version!==2)throw 0;P=d.fuente||d;guardar();V={v:'inicio'};render();aviso('Levantamiento cargado')}catch(e){aviso('Ese archivo no es un levantamiento de esta versión')}};
 
@@ -307,7 +380,7 @@ async function exportar(){
       fotos:[...acot,...es.fotos.map(f=>({muro:null,img:f.img}))]})}
   return out}
 async function fotoAcotada(w,es){const im=new Image();await new Promise(r=>{im.onload=r;im.onerror=r;im.src=w.foto.img});const r0=Math.min(1,1280/Math.max(im.width||1280,im.height||1280)),c=document.createElement('canvas');c.width=Math.round((im.width||1280)*r0);c.height=Math.round((im.height||960)*r0);const x=c.getContext('2d');try{x.drawImage(im,0,0,c.width,c.height)}catch(e){}
-  dibujaMarcas(x,w.foto.marcas,c.width,c.height,-1,1,m=>etiquetaDe(w,m,es));
+  dibujaMarcas(x,w,c.width,c.height,-1,false);
   return c.toDataURL('image/jpeg',.7)}
 function pdf(out){
   if(!window.jspdf)return null;const doc=new window.jspdf.jsPDF({unit:'mm',format:'letter'}),W=216,H=279,mg=16;let y;
@@ -326,7 +399,8 @@ function pdf(out){
       else{const L=Math.hypot(b[0]-a[0],b[1]-a[1])||1,nx=-(b[1]-a[1])/L*.6,ny=(b[0]-a[0])/L*.6;[1,-1].forEach(q=>doc.line(a[0]+nx*q,a[1]+ny*q,b[0]+nx*q,b[1]+ny*q))}});
     doc.setLineWidth(.8);
     y=170;es.muros.forEach(w=>{if(y>H-20){doc.addPage();y=22}txt(`Muro ${w.n}: ancho ${cm(w.largo)||'?'} · alto ${cm(w.altura)}${w.zoclo?` · zoclo ${cm(w.zoclo)}`:''} · ${w.esquina==='saliente'?'gira a la izquierda':'gira a la derecha'}`,mg,y,10,true);y+=6;
-      w.elementos.forEach(e=>{const t=TIPOS[e.tipo];txt(`   ${t.n}: ${t.c.map(([k2,l])=>`${l.split(' (')[0].toLowerCase()} ${cm(e[k2])||'?'}`).join(', ')}${e.dist!=null?`, a ${cm(e.dist)} de la esquina ${e.lado==='der'?'derecha':'izquierda'}`:''}`,mg,y,9);y+=5});y+=2});
+      w.elementos.forEach(e=>{const t=TIPOS[e.tipo]||{n:e.tipo},q=[];[['ancho','ancho'],['alto','alto'],['peralte','peralte'],['antepecho','antepecho'],['altura','altura'],['sobresale','sobresale']].forEach(([k,l])=>{if(e[k]!=null)q.push(`${l} ${cm(e[k])}`)});
+        txt(`   ${t.n}: ${q.join(', ')||'sin medidas'}${e.dist!=null?`, a ${cm(e.dist)} de la esquina ${e.lado==='der'?'derecha':'izquierda'}`:', sin ubicar'}`,mg,y,9);y+=5});y+=2});
     es.fotos.forEach(f=>{doc.addPage();txt(`${es.nombre} · ${f.muro?'Muro '+f.muro:'Foto general'}`,mg,20,13,true);const pr=doc.getImageProperties(f.img),mw=W-2*mg,mh=H-50,r=Math.min(mw/pr.width,mh/pr.height);doc.addImage(f.img,'JPEG',mg,28,pr.width*r,pr.height*r)})});
   txt('NODO · dev.rk',mg,H-8,8);return doc.output('blob')}
 let okEnv=0;
