@@ -92,7 +92,7 @@ const IC={marco:'<svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 7V3
  inst:'<svg viewBox="0 0 24 24" width="20" height="20"><rect x="5" y="3" width="14" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9.5" cy="10" r="1.4" fill="currentColor"/><circle cx="14.5" cy="10" r="1.4" fill="currentColor"/><path d="M10 15h4" stroke="currentColor" stroke-width="2"/></svg>',
  estr:'<svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 5h18v4H3zM8 9v12M16 9v12" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
  cota:'<svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 12h18M3 8v8M21 8v8M7 10l-4 2 4 2M17 10l4 2-4 2" fill="none" stroke="currentColor" stroke-width="2"/></svg>'};
-const HERR={marco:{n:'Marco',f:'marco',t:['marco'],h:'Arrastra de una esquina del muro a la contraria: es la guía de dónde a dónde se mide.'},
+const HERR={marco:{n:'Marco',f:'marco',t:['marco'],h:'Arrastra de una esquina del muro a la contraria. Después acomoda los puntos blancos en las esquinas reales del muro.'},
   puerta:{n:'Puerta',f:'caja',t:['puerta'],h:'Arrastra sobre la puerta, de una esquina a la otra.'},
   ventana:{n:'Ventana',f:'caja',t:['ventana'],h:'Arrastra sobre la ventana.'},
   inst:{n:'Instalación',f:'punto',t:['contacto','apagador','toma','caja'],h:'Toca el centro del contacto, apagador o toma de agua (las cajas, en su esquina derecha).'},
@@ -188,9 +188,15 @@ function resuelve(w){
   return{pos,conf:[...X.conf,...Y.conf],marco:!!marco}
 }
 /* coordenada en la foto (0–1) de un nodo: orilla l/r/b/t de una caja o marco, c de un punto */
-function coordFoto(ms,nd,eje){const m=ms.find(q=>q.id===nd.id);if(!m)return null;
-  if(m.forma==='punto')return eje==='h'?m.p[0]:m.p[1];const x1=Math.min(m.p[0],m.p[2]),x2=Math.max(m.p[0],m.p[2]),y1=Math.min(m.p[1],m.p[3]),y2=Math.max(m.p[1],m.p[3]);
-  return{l:x1,r:x2,t:y1,b:y2}[nd.ref]}
+/* marco en perspectiva: 4 esquinas (sup-izq, sup-der, inf-der, inf-izq). F: foto -> muro enderezado (0-1), G: al reves */
+function esquinas(m){if(m.q)return m.q;const x1=Math.min(m.p[0],m.p[2]),x2=Math.max(m.p[0],m.p[2]),y1=Math.min(m.p[1],m.p[3]),y2=Math.max(m.p[1],m.p[3]);return[[x1,y1],[x2,y1],[x2,y2],[x1,y2]]}
+function homog(q){const [[x0,y0],[x1,y1],[x2,y2],[x3,y3]]=q,dx1=x1-x2,dx2=x3-x2,dy1=y1-y2,dy2=y3-y2,sx=x0-x1+x2-x3,sy=y0-y1+y2-y3;let g=0,h=0;
+  if(Math.abs(sx)>1e-9||Math.abs(sy)>1e-9){const den=dx1*dy2-dx2*dy1||1e-9;g=(sx*dy2-dx2*sy)/den;h=(dx1*sy-sx*dy1)/den}
+  const a=x1-x0+g*x1,b=x3-x0+h*x3,c=x0,d=y1-y0+g*y1,e=y3-y0+h*y3,f=y0;
+  const A=e-f*h,B=c*h-b,C=b*f-c*e,D=f*g-d,E2=a-c*g,F2=c*d-a*f,G2=d*h-e*g,H2=b*g-a*h,I2=a*e-b*d;
+  return{G:([u,v])=>{const w=g*u+h*v+1;return[(a*u+b*v+c)/w,(d*u+e*v+f)/w]},F:([x,y])=>{const w=G2*x+H2*y+I2;return[(A*x+B*y+C)/w,(D*x+E2*y+F2)/w]}}}
+function RX(ms){const m=ms.find(q=>q.tipo==='marco');if(!m)return{F:p=>p,G:p=>p};return homog(esquinas(m))}
+function coordFoto(ms,nd,eje){const n=nodos(ms).find(q=>q.id===nd.id&&q.ref===nd.ref);if(!n)return null;return eje==='h'?n.ru:n.rv}
 function nombreN(ms,m){const t=TIPOS[m.tipo];if(m.tipo==='marco')return'Marco';return t.n.split(' ')[0]+' '+(ms.filter(q=>q.tipo===m.tipo).indexOf(m)+1)}
 const REFN={l:'orilla izq.',r:'orilla der.',b:'abajo',t:'arriba',c:'centro'};
 function problemas(es,w){const r=[],A=w.altura,L=w.largo;
@@ -293,13 +299,16 @@ function etiquetaDe(w,m){const t=TIPOS[m.tipo],d=m.datos||{},ms=w.foto.marcas;if
   if(m.tipo==='marco')return`Muro ${cm(w.largo)||'?'} × ${cm(w.altura)||'?'}`;
   if(m.tipo==='cota')return(d.valor!=null?cm(d.valor):'?')+(d.nota?' '+d.nota:'');
   const n=nombreN(ms,m),med=t.c.filter(([k])=>k!=='sobresale').map(([k])=>cm(d[k])||'?').join('×');return med?`${n} ${med}`:n}
-function nodos(ms){const out=[];ms.forEach(m=>{if(m.tipo==='cota')return;
-  if(m.forma==='punto')out.push({id:m.id,ref:'c',x:m.p[0],y:m.p[1],x1:m.p[0]-.04,x2:m.p[0]+.04,y1:m.p[1]-.04,y2:m.p[1]+.04});
+function nodos(ms){const out=[],{F}=RX(ms),mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];ms.forEach(m=>{if(m.tipo==='cota')return;
+  if(m.forma==='punto'){const [u,v]=F(m.p);out.push({id:m.id,ref:'c',x:m.p[0],y:m.p[1],ru:u,rv:v,u1:u-.04,u2:u+.04,v1:v-.04,v2:v+.04})}
+  else if(m.forma==='marco'){const q=esquinas(m),L=mid(q[0],q[3]),R=mid(q[1],q[2]),T=mid(q[0],q[1]),B=mid(q[3],q[2]);
+    out.push({id:m.id,ref:'l',x:L[0],y:L[1],ru:0,rv:.5,v:1,v1:0,v2:1},{id:m.id,ref:'r',x:R[0],y:R[1],ru:1,rv:.5,v:1,v1:0,v2:1},{id:m.id,ref:'t',x:T[0],y:T[1],ru:.5,rv:0,h:1,u1:0,u2:1},{id:m.id,ref:'b',x:B[0],y:B[1],ru:.5,rv:1,h:1,u1:0,u2:1})}
   else{const x1=Math.min(m.p[0],m.p[2]),x2=Math.max(m.p[0],m.p[2]),y1=Math.min(m.p[1],m.p[3]),y2=Math.max(m.p[1],m.p[3]);
-    out.push({id:m.id,ref:'l',x:x1,y:(y1+y2)/2,v:1,y1,y2},{id:m.id,ref:'r',x:x2,y:(y1+y2)/2,v:1,y1,y2},{id:m.id,ref:'t',x:(x1+x2)/2,y:y1,h:1,x1,x2},{id:m.id,ref:'b',x:(x1+x2)/2,y:y2,h:1,x1,x2})}});return out}
-function pega(ms,p,eje){let best=null,bd=.085;nodos(ms).forEach(n=>{let d;
-    if(eje==='h'){if(n.h)return;const fuera=Math.max(0,(n.y1??n.y)-.08-p[1],p[1]-(n.y2??n.y)-.08);d=Math.abs(p[0]-n.x)+fuera}
-    else{if(n.v)return;const fuera=Math.max(0,(n.x1??n.x)-.08-p[0],p[0]-(n.x2??n.x)-.08);d=Math.abs(p[1]-n.y)+fuera}
+    const cs=[[x1,y1],[x2,y1],[x2,y2],[x1,y2]].map(F),us=cs.map(c=>c[0]),vs=cs.map(c=>c[1]),u1=Math.min(...us),u2=Math.max(...us),v1=Math.min(...vs),v2=Math.max(...vs);
+    out.push({id:m.id,ref:'l',x:x1,y:(y1+y2)/2,ru:u1,rv:(v1+v2)/2,v:1,v1,v2},{id:m.id,ref:'r',x:x2,y:(y1+y2)/2,ru:u2,rv:(v1+v2)/2,v:1,v1,v2},{id:m.id,ref:'t',x:(x1+x2)/2,y:y1,ru:(u1+u2)/2,rv:v1,h:1,u1,u2},{id:m.id,ref:'b',x:(x1+x2)/2,y:y2,ru:(u1+u2)/2,rv:v2,h:1,u1,u2})}});return out}
+function pega(ms,p,eje){let best=null,bd=.085;const [pu,pv]=RX(ms).F(p);nodos(ms).forEach(n=>{let d;
+    if(eje==='h'){if(n.h)return;const fuera=Math.max(0,(n.v1??n.rv)-.08-pv,pv-(n.v2??n.rv)-.08);d=Math.abs(pu-n.ru)+fuera}
+    else{if(n.v)return;const fuera=Math.max(0,(n.u1??n.ru)-.08-pu,pu-(n.u2??n.ru)-.08);d=Math.abs(pv-n.rv)+fuera}
     if(d<bd){bd=d;best=n}});return best}
 function dibujaMarcas(x,w,W,H,s,guias,reg){
   const ms=w.foto.marcas,lw=Math.max(3,W/260),fs=Math.max(18,W/36);x.font=`700 ${fs}px sans-serif`;x.lineCap='round';
@@ -308,7 +317,11 @@ function dibujaMarcas(x,w,W,H,s,guias,reg){
     x.fillStyle=vacio?'#fff':c;x.fillText(t,tx,ty);if(ed&&reg)reg.push({x:tx-6,y:ty-fs-2,w:tw+12,h:fs*1.35,...ed})};
   const num=v=>v==null?null:cm(v);
   ms.forEach((m,i)=>{const t=TIPOS[m.tipo];if(!t||m.forma==='cota')return;const c=COL[m.tipo]||'#fff',on=i===s,d=m.datos||{},p=m.p.map((v,k)=>v*(k%2?H:W));x.strokeStyle=c;x.fillStyle=c;x.lineWidth=on?lw*2:lw;x.setLineDash([]);
-    if(m.forma==='marco'||m.forma==='caja'){const bx=Math.min(p[0],p[2]),by=Math.min(p[1],p[3]),bw=Math.abs(p[2]-p[0]),bh=Math.abs(p[3]-p[1]);
+    if(m.forma==='marco'){const q=esquinas(m).map(([a,b])=>[a*W,b*H]);x.setLineDash([lw*4,lw*3]);x.beginPath();q.forEach(([a,b],k)=>k?x.lineTo(a,b):x.moveTo(a,b));x.closePath();x.stroke();x.setLineDash([]);
+      if(on){x.globalAlpha=.15;x.fill();x.globalAlpha=1}
+      q.forEach(([a,b])=>{x.beginPath();x.arc(a,b,lw*(on?5:3.6),0,7);x.fillStyle='#fff';x.fill();x.lineWidth=Math.max(2,lw*.8);x.strokeStyle='#000';x.stroke()});x.fillStyle=c;x.strokeStyle=c;
+      const a=num(w.largo),h=num(w.altura);rot(a?`muro ${a}`:'ancho muro ?',(q[2][0]+q[3][0])/2-fs*2,(q[2][1]+q[3][1])/2-lw*4,c,{id:m.id,key:'largo'},!a);rot(h?`alto ${h}`:'alto muro ?',(q[0][0]+q[3][0])/2+lw*5,(q[0][1]+q[3][1])/2,c,{id:m.id,key:'altura'},!h)}
+    else if(m.forma==='caja'){const bx=Math.min(p[0],p[2]),by=Math.min(p[1],p[3]),bw=Math.abs(p[2]-p[0]),bh=Math.abs(p[3]-p[1]);
       if(m.forma==='marco')x.setLineDash([lw*4,lw*3]);x.strokeRect(bx,by,bw,bh);x.setLineDash([]);if(on){x.globalAlpha=.15;x.fillRect(bx,by,bw,bh);x.globalAlpha=1}
       if(m.forma==='marco'){const a=num(w.largo),h=num(w.altura);rot(a?`muro ${a}`:'ancho muro ?',bx+bw-fs*6,by+bh-lw*3,c,{id:m.id,key:'largo'},!a);rot(h?`alto ${h}`:'alto muro ?',bx+lw*3,by+fs*2.2,c,{id:m.id,key:'altura'},!h)}
       else{rot(nombreN(ms,m),bx,by-lw*2,c);const tieneA=t.c.some(([k])=>k==='alto');
@@ -317,7 +330,8 @@ function dibujaMarcas(x,w,W,H,s,guias,reg){
     else{x.beginPath();x.arc(p[0],p[1],lw*3.5,0,7);x.fill();rot(nombreN(ms,m),p[0]+lw*5,p[1]-lw*3,c)}});
   ms.forEach((m,i)=>{if(m.forma!=='cota')return;const d=m.datos,c=COL.cota,on=i===s,p=m.p.map((v,k)=>v*(k%2?H:W));x.strokeStyle=c;x.lineWidth=on?lw*1.6:lw*.9;
     let a=[p[0],p[1]],b=[p[2],p[3]];
-    if(d.a&&d.b){const ca=coordFoto(ms,d.a,d.eje),cb=coordFoto(ms,d.b,d.eje);if(ca!=null&&cb!=null){if(d.eje==='h'){const y=(p[1]+p[3])/2;a=[ca*W,y];b=[cb*W,y]}else{const xx=(p[0]+p[2])/2;a=[xx,ca*H];b=[xx,cb*H]}}}
+    if(d.a&&d.b){const ca=coordFoto(ms,d.a,d.eje),cb=coordFoto(ms,d.b,d.eje);if(ca!=null&&cb!=null){const {F,G}=RX(ms),[mu,mv]=F([(m.p[0]+m.p[2])/2,(m.p[1]+m.p[3])/2]),px=r=>[r[0]*W,r[1]*H];
+      if(d.eje==='h'){a=px(G([ca,mv]));b=px(G([cb,mv]))}else{a=px(G([mu,ca]));b=px(G([mu,cb]))}}}
     x.beginPath();x.moveTo(a[0],a[1]);x.lineTo(b[0],b[1]);x.stroke();const ang=Math.atan2(b[1]-a[1],b[0]-a[0]),q=lw*3;
     [a,b].forEach(([u,v])=>{x.beginPath();x.moveTo(u-q*Math.sin(ang),v+q*Math.cos(ang));x.lineTo(u+q*Math.sin(ang),v-q*Math.cos(ang));x.stroke()});
     if(!(d.a&&d.b)){x.setLineDash([lw,lw*2]);x.strokeRect(a[0]-lw*2,a[1]-lw*2,lw*4,lw*4);x.setLineDash([])}
@@ -346,7 +360,7 @@ const Z={};
 function aplicaZoom(i){const c=$('cv'+i),z=Z[i];if(!c)return;if(!z||z.s<=1.01){c.style.transform='';Z[i]={s:1,x:0,y:0};const b=document.querySelector(`[data-z1="${i}"]`);if(b)b.style.display='none';return}
   const W=c.parentElement.clientWidth,H=c.parentElement.clientHeight;z.x=Math.min(0,Math.max(W-W*z.s,z.x));z.y=Math.min(0,Math.max(H-H*z.s,z.y));c.style.transformOrigin='0 0';c.style.transform=`translate(${z.x}px,${z.y}px) scale(${z.s})`;const b=document.querySelector(`[data-z1="${i}"]`);if(b)b.style.display='block'}
 function eventos(i){
-  const c=$('cv'+i);if(!c)return;let ini=null,tmp=null;const dedos=new Map();let pinch=null;aplicaZoom(i);
+  const c=$('cv'+i);if(!c)return;let ini=null,tmp=null,esq=null;const dedos=new Map();let pinch=null;aplicaZoom(i);
   const cont=c.parentElement;
   cont.addEventListener('pointerdown',ev=>{dedos.set(ev.pointerId,[ev.clientX,ev.clientY]);if(dedos.size===2){ini=null;tmp=null;pinta(i);const [p1,p2]=[...dedos.values()],r=cont.getBoundingClientRect(),z=Z[i]||{s:1,x:0,y:0};pinch={d:Math.hypot(p2[0]-p1[0],p2[1]-p1[1]),m:[(p1[0]+p2[0])/2-r.left,(p1[1]+p2[1])/2-r.top],z:{...z}}}},true);
   cont.addEventListener('pointermove',ev=>{if(!dedos.has(ev.pointerId))return;dedos.set(ev.pointerId,[ev.clientX,ev.clientY]);if(pinch&&dedos.size>=2){const [p1,p2]=[...dedos.values()],r=cont.getBoundingClientRect(),d=Math.hypot(p2[0]-p1[0],p2[1]-p1[1]),m=[(p1[0]+p2[0])/2-r.left,(p1[1]+p2[1])/2-r.top];
@@ -357,17 +371,21 @@ function eventos(i){
     if(V.m!==i){V.m=i;sel=-1;herr='sel';HIST=[];render(true);return}
     if(herr==='sel'){const px=p[0]*c.width,py=p[1]*c.height,L=(LBL[i]||[]).find(r=>px>=r.x-8&&px<=r.x+r.w+8&&py>=r.y-8&&py<=r.y+r.h+8);
       if(L){sel=E().muros[i].foto.marcas.findIndex(q=>q.id===L.id);editor();abreEdicion(i,L.id,L.key);return}
+      const ms=E().muros[i].foto.marcas,mk=ms.find(q=>q.tipo==='marco');if(mk){const q=esquinas(mk),im=IMGS[i],ar=im.height/im.width;let k=-1,bd=.06;q.forEach((e,j)=>{const dd=Math.hypot(e[0]-p[0],(e[1]-p[1])*ar);if(dd<bd){bd=dd;k=j}});
+        if(k>=0){snap();mk.q=q.map(e=>[...e]);sel=ms.indexOf(mk);esq={k,m:mk};c.setPointerCapture(ev.pointerId);pinta(i);return}}
       sel=busca(p);pinta(i);editor();return}
     c.setPointerCapture(ev.pointerId);const H=HERR[herr];
     if(H.f==='punto'){agrega({forma:'punto',p:[p[0],p[1]]},H.t[0]);return}
     ini=p;tmp={forma:H.f,p:[p[0],p[1],p[0],p[1]],tipo:H.t[0],datos:{}}};
-  c.onpointermove=ev=>{if(!ini||dedos.size>1)return;const p=pos(ev);tmp.p=[ini[0],ini[1],p[0],p[1]];pinta(i);const x=c.getContext('2d'),w=E().muros[i];
+  c.onpointermove=ev=>{if(esq&&dedos.size<2){const p=pos(ev).map(v=>Math.max(0,Math.min(1,v))),m=esq.m;m.q[esq.k]=p;const xs=m.q.map(e=>e[0]),ys=m.q.map(e=>e[1]);m.p=[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];pinta(i);return}
+    if(!ini||dedos.size>1)return;const p=pos(ev);tmp.p=[ini[0],ini[1],p[0],p[1]];pinta(i);const x=c.getContext('2d'),w=E().muros[i];
     dibujaMarcas(x,{...w,foto:{...w.foto,marcas:[...w.foto.marcas,{...tmp,id:'tmp'}]}},c.width,c.height,w.foto.marcas.length,herr==='cota')};
-  c.onpointerup=ev=>{if(!ini||pinch)return;const p=pos(ev),q=ini,f=tmp.forma,t=tmp.tipo;ini=null;tmp=null;if(Math.hypot(p[0]-q[0],p[1]-q[1])<.03){pinta(i);return}agrega({forma:f,p:[q[0],q[1],p[0],p[1]]},t)};
+  c.onpointerup=ev=>{if(esq){esq=null;guardar();render(true);return}if(!ini||pinch)return;const p=pos(ev),q=ini,f=tmp.forma,t=tmp.tipo;ini=null;tmp=null;if(Math.hypot(p[0]-q[0],p[1]-q[1])<.03){pinta(i);return}agrega({forma:f,p:[q[0],q[1],p[0],p[1]]},t)};
 }
 function busca(p){const ms=M().foto.marcas;let best=-1,bd=.05;
   ms.forEach((m,i)=>{let d;if(m.forma==='punto')d=Math.hypot(p[0]-m.p[0],p[1]-m.p[1]);
-    else if(m.forma==='caja'||m.forma==='marco'){const [a,b,c2,d2]=m.p,x1=Math.min(a,c2),x2=Math.max(a,c2),y1=Math.min(b,d2),y2=Math.max(b,d2),dentro=p[0]>=x1&&p[0]<=x2&&p[1]>=y1&&p[1]<=y2;
+    else if(m.forma==='marco'){const [u,v]=RX(ms).F(p);d=u>=0&&u<=1&&v>=0&&v<=1?.045:1}
+    else if(m.forma==='caja'){const [a,b,c2,d2]=m.p,x1=Math.min(a,c2),x2=Math.max(a,c2),y1=Math.min(b,d2),y2=Math.max(b,d2),dentro=p[0]>=x1&&p[0]<=x2&&p[1]>=y1&&p[1]<=y2;
       d=m.forma==='marco'?(dentro?.045:1):(dentro?.02:1)}
     else{const [x1,y1,x2,y2]=m.p,L=Math.hypot(x2-x1,y2-y1)||1e-6,t=Math.max(0,Math.min(1,((p[0]-x1)*(x2-x1)+(p[1]-y1)*(y2-y1))/L/L));d=Math.hypot(p[0]-(x1+t*(x2-x1)),p[1]-(y1+t*(y2-y1)))*.8}
     if(d<bd){bd=d;best=i}});return best}
@@ -377,7 +395,8 @@ function agrega(m,tipo){const w=M(),ms=w.foto.marcas,t=TIPOS[tipo];
   if(m.forma==='cota'){const im=IMGS[V.m]||{width:1,height:1},dx=(m.p[2]-m.p[0])*im.width,dy=(m.p[3]-m.p[1])*im.height,eje=Math.abs(dx)>=Math.abs(dy)?'h':'v';
     const a=pega(ms,[m.p[0],m.p[1]],eje),b=pega(ms,[m.p[2],m.p[3]],eje);m.datos={eje,a:a?{id:a.id,ref:a.ref}:null,b:b?{id:b.id,ref:b.ref}:null,valor:null,nota:''};
     if(!a||!b||(a.id===b.id&&a.ref===b.ref)){aviso('La cota tiene que empezar y terminar en un punto verde (orilla del marco, de una caja o el centro de un contacto).');herr='cota';render(true);return}}
-  ms.push(m);sel=ms.length-1;herr='sel';const vs=vacios(w,m);EDIT=vs.length?{i:V.m,id:m.id,key:vs[0]}:null;guardar();render(true)}
+  if(tipo==='marco')m.q=esquinas(m);
+  ms.push(m);sel=ms.length-1;herr='sel';if(tipo==='marco')setTimeout(()=>aviso('Si la foto salió chueca, arrastra los puntos blancos a las esquinas reales del muro'),1800);const vs=vacios(w,m);EDIT=vs.length?{i:V.m,id:m.id,key:vs[0]}:null;guardar();render(true)}
 function editor(){
   const ed=$('ed'+V.m);if(!ed)return;const w=M(),f=w.foto;if(!f||sel<0||!f.marcas[sel]){ed.innerHTML='';return}
   const ms=f.marcas,m=ms[sel],t=TIPOS[m.tipo],d=m.datos,R=resuelve(w),p=R.pos[m.id]||{},op=OPC[m.tipo]||[m.tipo];
