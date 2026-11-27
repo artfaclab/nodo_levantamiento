@@ -44,6 +44,9 @@ button.p{background:var(--ink);color:var(--pn)}button.a{background:var(--ac);bor
 .thumbs button{position:absolute;top:4px;right:4px;min-height:28px;padding:0 8px;font-size:12px}
 #msg{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);background:var(--ink);color:var(--pn);padding:10px 16px;border-radius:8px;font-size:14px;display:none;z-index:9;max-width:90vw}
 .hid{display:none}
+.inl{position:absolute;z-index:4;width:7.5em;font:700 20px 'Schibsted Grotesk',sans-serif;padding:6px 8px;min-height:44px;border:3px solid var(--cota);border-radius:8px;background:#000;color:var(--cota);box-shadow:0 4px 16px rgba(0,0,0,.5)}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;scroll-snap-type:x mandatory}.tabs button{flex:none;scroll-snap-align:start;min-height:42px}
+.sw .ren{position:absolute;inset:0 auto 0 0;width:110px;background:var(--ok);border-color:var(--ok);color:#fff;border-radius:0}
 .sw{position:relative;margin-bottom:8px;border-radius:8px;overflow:hidden}.sw .lst{margin:0;position:relative;z-index:1;transition:transform .2s;touch-action:pan-y}.sw .del{position:absolute;inset:0 0 0 auto;width:110px;background:var(--ac);border-color:var(--ac);color:#fff;border-radius:0}
 @media(prefers-reduced-motion:reduce){.sw .lst{transition:none}}details summary{cursor:pointer;color:var(--mut);font-size:14px}
 </style></head><body>
@@ -143,16 +146,19 @@ function inicio(){
   <div class="pn"><div class="g2"><div><label for="pUs">Técnico</label><input id="pUs" value="${esc(P.usuario)}"></div><div><label for="pFe">Fecha</label><input id="pFe" value="${esc(P.fecha)}"></div></div>
    <label for="pPr">Proyecto</label><input id="pPr" value="${esc(P.proyecto)}"><label for="pCl">Cliente</label><input id="pCl" value="${esc(P.cliente)}"></div>
   <h2>Espacios</h2>
-  ${P.espacios.map((e,i)=>`<div class="sw"><button class="del" data-del="${i}">Borrar</button><button class="lst" data-e="${i}"><b>${esc(e.nombre)}</b><span>${e.muros.length} muros · ${e.muros.filter(w=>w.foto).length} fotos</span></button></div>`).join('')+(P.espacios.length?'<p class="hint">Desliza un espacio a la izquierda para borrarlo.</p>':'')||'<p class="hint">Agrega el espacio que vas a medir: un cuarto, un vestidor, una cocina.</p>'}
+  ${P.espacios.map((e,i)=>`<div class="sw"><button class="ren" data-ren="${i}">Renombrar</button><button class="del" data-del="${i}">Borrar</button><button class="lst" data-e="${i}"><b>${esc(e.nombre)}</b><span>${e.muros.length} muros · ${e.muros.filter(w=>w.foto).length} fotos</span></button></div>`).join('')+(P.espacios.length?'<p class="hint">Desliza un espacio a la izquierda para borrarlo, o a la derecha para cambiarle el nombre.</p>':'')||'<p class="hint">Agrega el espacio que vas a medir: un cuarto, un vestidor, una cocina.</p>'}
   <button class="s" id="bNE" style="width:100%">+ Agregar espacio</button>
   <details class="pn" style="margin-top:12px"><summary>Más opciones</summary><div class="row" style="margin-top:10px"><button class="s" id="bNP">Nuevo proyecto</button><button class="s" id="bCargar">Cargar levantamiento</button></div></details>`;
   [['pUs','usuario'],['pFe','fecha'],['pPr','proyecto'],['pCl','cliente']].forEach(([id,k])=>$(id).oninput=ev=>{P[k]=ev.target.value;guardar()});
   document.querySelectorAll('[data-e]').forEach(b=>{let x0=null,dx=0,abierto=false;
     b.onpointerdown=ev=>{x0=ev.clientX;dx=0};
-    b.onpointermove=ev=>{if(x0==null)return;dx=ev.clientX-x0;if(dx<0||abierto)b.style.transform=`translateX(${Math.max(-110,Math.min(0,(abierto?-110:0)+dx))}px)`};
-    b.onpointerup=()=>{if(x0==null)return;x0=null;if(dx<-50){abierto=true;b.style.transform='translateX(-110px)'}else if(abierto&&dx>30){abierto=false;b.style.transform=''}else if(abierto){}else b.style.transform=''};
-    b.onpointercancel=()=>{x0=null;b.style.transform=abierto?'translateX(-110px)':''};
-    b.onclick=()=>{if(Math.abs(dx)>10)return;if(abierto){abierto=false;b.style.transform='';return}V={v:'espacio',e:+b.dataset.e,m:0};sel=-1;herr='sel';HIST=[];render()}});
+    const pon=v=>{abierto=v;b.style.transform=v?`translateX(${v}px)`:'';const sw=b.parentElement;sw.querySelector('.del').style.visibility=v>0?'hidden':'';sw.querySelector('.ren').style.visibility=v<0?'hidden':''};
+    b.onpointermove=ev=>{if(x0==null)return;dx=ev.clientX-x0;const base=abierto||0;const v=Math.max(-110,Math.min(110,base+dx));b.style.transform=`translateX(${v}px)`;const sw=b.parentElement;sw.querySelector('.del').style.visibility=v>0?'hidden':'';sw.querySelector('.ren').style.visibility=v<0?'hidden':''};
+    b.onpointerup=()=>{if(x0==null)return;x0=null;const v=(abierto||0)+dx;if(Math.abs(dx)<10){return}pon(v<-50?-110:v>50?110:false)};
+    b.onpointercancel=()=>{x0=null;pon(abierto)};
+    b.onclick=()=>{if(Math.abs(dx)>10)return;if(abierto){pon(false);return}V={v:'espacio',e:+b.dataset.e,m:0};sel=-1;herr='sel';HIST=[];render()}});
+  document.querySelectorAll('[data-ren]').forEach(b=>b.onclick=()=>{const i=+b.dataset.ren,sw=b.parentElement;sw.innerHTML=`<input id="rn" value="${esc(P.espacios[i].nombre)}" style="font-weight:700">`;const r=$('rn');r.focus();r.select();
+    const ok=()=>{P.espacios[i].nombre=r.value.trim()||P.espacios[i].nombre;guardar();render()};r.onkeydown=ev=>{if(ev.key==='Enter')r.blur()};r.onblur=ok});
   document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{if(b.dataset.c){P.espacios.splice(+b.dataset.del,1);guardar();render()}else{b.dataset.c=1;b.textContent='¿Seguro?'}});
   $('bNE').onclick=()=>{P.espacios.push({nombre:'ESPACIO '+String(P.espacios.length+1).padStart(2,'0'),espesor:150,cerrado:false,muros:[nuevoMuro()],fotos:[]});guardar();V={v:'espacio',e:P.espacios.length-1,m:0};sel=-1;herr='sel';HIST=[];render()};
   $('bNP').onclick=ev=>{const b=ev.target;if(b.dataset.c){P=nuevo();guardar();render()}else{b.dataset.c=1;b.textContent='Toca otra vez para borrar todo'}};
@@ -222,19 +228,21 @@ function muroHtml(es,w,i){
   ${f?`<div class="foto" style="margin-top:8px"><canvas id="cv${i}" data-w="${i}"></canvas><button class="s" data-z1="${i}" style="position:absolute;top:8px;right:8px;display:none;min-height:36px;z-index:2">Ajustar</button></div>
    <p class="hint" style="margin:4px 2px 0">Pellizca la foto con dos dedos para acercar.</p>
    <div class="tools" style="grid-template-columns:repeat(3,minmax(0,1fr))">${Object.entries(HERR).map(([k,h])=>`<button class="${act&&herr===k?'on':'s'}" data-h="${k}" data-w="${i}" style="display:flex;gap:6px;align-items:center;justify-content:center">${IC[k]}${h.n}</button>`).join('')}<button class="s" data-des="${i}" ${act&&HIST.length?'':'disabled'}>↶ Deshacer</button></div>
-   ${act?`<p class="hint">${herr==='sel'?(f.marcas.some(m=>m.tipo==='marco')?'Marca puertas, ventanas, instalaciones o estructura, y amárralas con cotas. Toca una marca para ver sus medidas.':'Empieza con <b>Marco</b>: enmarca el muro de orilla a orilla.'):HERR[herr].h}</p>`:''}`
+   ${act?`<p class="hint">${herr==='sel'?(f.marcas.some(m=>m.tipo==='marco')?'Marca puertas, ventanas, instalaciones o estructura y amárralas con cotas. Toca cualquier número de la foto para escribirlo.':'Empieza con <b>Marco</b>: enmarca el muro de orilla a orilla.'):HERR[herr].h}</p>`:''}`
    :`<button class="vacio" data-tf="${i}" style="width:100%;margin-top:8px"><div><b style="font-size:18px">Tomar foto del muro ${i+1}</b><br><span class="hint">Párate frente al muro, de preferencia con el teléfono horizontal</span></div></button>`}
   <div id="ed${i}"></div>
-  <div class="g3"><div><label for="wL${i}">Ancho (cm)</label><input id="wL${i}" data-w="${i}" data-k="largo" inputmode="decimal" value="${cm(w.largo)}"></div>
+  <div class="g3" ${f&&f.marcas.some(m=>m.tipo==='marco')?'style="display:none"':''}><div><label for="wL${i}">Ancho (cm)</label><input id="wL${i}" data-w="${i}" data-k="largo" inputmode="decimal" value="${cm(w.largo)}"></div>
    <div><label for="wA${i}">Alto (cm)</label><input id="wA${i}" data-w="${i}" data-k="altura" inputmode="decimal" value="${cm(w.altura)}"></div>
-   <div><label for="wZ${i}">Zoclo (cm)</label><input id="wZ${i}" data-w="${i}" data-k="zoclo" inputmode="decimal" placeholder="sin" value="${w.zoclo?cm(w.zoclo):''}"></div></div>
+   <div></div></div>
+  <div class="row" style="margin-top:8px"><label for="wZ${i}" style="margin:0">Zoclo (cm)</label><input id="wZ${i}" data-w="${i}" data-k="zoclo" inputmode="decimal" placeholder="sin zoclo" value="${w.zoclo?cm(w.zoclo):''}" style="width:9em"></div>
   ${pr.map(q=>`<p class="warn" style="margin:6px 0 0">⚠ ${esc(q.t)}${q.k?` <button class="s" data-fix="${i}" data-k="${q.k}" data-v="${q.v}" style="min-height:34px">Usar ${cm(q.v)}</button>`:''}</p>`).join('')}
   <div class="row" style="margin-top:8px;justify-content:flex-end">${f?`<button class="s" data-tf="${i}">Otra foto</button>`:''}<button class="s" data-bm="${i}">Borrar muro</button></div>
   </section>`}
 function espacio(){
   const es=E(),pl=planta(es),n=es.muros.length;if(V.m>=n)V.m=Math.max(0,n-1);
   $('app').innerHTML=`
-  <div class="row" style="justify-content:space-between;margin-bottom:8px"><input id="eNom" value="${esc(es.nombre)}" style="flex:1;font-weight:700"><button class="s" id="bBE">Borrar</button></div>
+  <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:nowrap"><div class="tabs" style="flex:1;margin:0">${P.espacios.map((x,k)=>`<button class="${k===V.e?'p':'s'}" data-tab="${k}">${esc(x.nombre)}</button>`).join('')}<button class="s" id="bTabN">+ Espacio</button></div><button class="s" id="bPro" style="flex:none">Proyecto</button></div>
+  <div style="height:8px"></div>
   <div class="plan" style="height:min(32vh,240px)"><svg id="pl"></svg></div>
   <p class="hint">Empieza por el muro de la entrada y recorre el cuarto siempre hacia tu derecha. La planta se arma sola.</p>
   ${n&&es.cerrado&&!pl.falt&&pl.cierre>20?`<p class="warn">Nota: la planta no cierra por ${cm(pl.cierre)} cm.</p>`:''}
@@ -246,8 +254,9 @@ function espacio(){
   dibujaPlanta($('pl'),es,V.m);
   es.muros.forEach((w,i)=>{if(w.foto)preparaFoto(i)});
   editor();
-  $('eNom').oninput=ev=>{es.nombre=ev.target.value;guardar()};
-  $('bBE').onclick=ev=>{const b=ev.target;if(b.dataset.c){P.espacios.splice(V.e,1);guardar();V={v:'inicio'};render()}else{b.dataset.c=1;b.textContent='¿Seguro?'}};
+  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{V={v:'espacio',e:+b.dataset.tab,m:0};sel=-1;herr='sel';HIST=[];EDIT=null;render()});
+  $('bTabN').onclick=()=>{P.espacios.push({nombre:'ESPACIO '+String(P.espacios.length+1).padStart(2,'0'),espesor:150,cerrado:false,muros:[nuevoMuro()],fotos:[]});guardar();V={v:'espacio',e:P.espacios.length-1,m:0};sel=-1;herr='sel';HIST=[];EDIT=null;render()};
+  $('bPro').onclick=()=>{V={v:'inicio'};EDIT=null;render()};
   if($('bNM'))$('bNM').onclick=()=>{es.muros.push(nuevoMuro());V.m=0;guardar();render(true)};
   if($('bMas'))$('bMas').onclick=()=>{$('nuevo').innerHTML=`<p class="hint">Para ver el muro ${n+1} de frente, ¿hacia dónde giras desde el muro ${n}?</p><div class="row"><button class="p" id="nIz" style="flex:1;min-height:64px;font-size:20px">← Izquierda</button><button class="p" id="nDe" style="flex:1;min-height:64px;font-size:20px">Derecha →</button></div>`;
     const agr=lado=>{es.muros[n-1].esquina=lado==='der'?'rincon':'saliente';es.muros.push(nuevoMuro(es.muros[n-1].altura));V.m=n;sel=-1;herr='sel';HIST=[];guardar();render(true);const q=$('mu'+n);if(q)q.scrollIntoView({behavior:'smooth',block:'start'})};
@@ -267,7 +276,8 @@ function espacio(){
   $('bFG').onclick=()=>$('fFotos').click();
   document.querySelectorAll('[data-bf]').forEach(b=>b.onclick=()=>{es.fotos.splice(+b.dataset.bf,1);guardar();render(true)});
   $('pl').querySelectorAll('[data-m]').forEach(g=>g.onclick=()=>{activa(+g.dataset.m);render(true);const s=$('mu'+g.dataset.m);if(s)s.scrollIntoView({behavior:'smooth',block:'start'})});
-  $('bar').innerHTML=`<button class="s" id="bAt">‹ Espacios</button><button class="a" id="bEnv2">Enviar</button>`;$('bAt').onclick=()=>{V={v:'inicio'};render()};$('bEnv2').onclick=enviar;
+  $('bar').innerHTML=`<button class="s" id="bAt">‹ Proyecto</button><button class="a" id="bEnv2">Enviar</button>`;$('bAt').onclick=()=>{V={v:'inicio'};EDIT=null;render()};$('bEnv2').onclick=enviar;
+  const t=document.querySelector('.tabs .p');if(t)t.scrollIntoView({inline:'center',block:'nearest'});
 }
 
 /* ---------- foto acotada ---------- */
@@ -276,7 +286,8 @@ function preparaFoto(i){const f=E().muros[i].foto,im=new Image();IMGS[i]=im;im.o
 function pinta(i=V.m){
   const c=$('cv'+i),im=IMGS[i];if(!c||!im||!im.complete)return;
   c.width=im.width;c.height=im.height;const x=c.getContext('2d');x.drawImage(im,0,0);
-  const w=E().muros[i];dibujaMarcas(x,w,c.width,c.height,i===V.m?sel:-1,i===V.m&&herr==='cota');
+  const w=E().muros[i];LBL[i]=[];dibujaMarcas(x,w,c.width,c.height,i===V.m?sel:-1,i===V.m&&herr==='cota',LBL[i]);
+  if(EDIT&&EDIT.i===i)muestraInput(i);
 }
 function etiquetaDe(w,m){const t=TIPOS[m.tipo],d=m.datos||{},ms=w.foto.marcas;if(!t)return'';
   if(m.tipo==='marco')return`Muro ${cm(w.largo)||'?'} × ${cm(w.altura)||'?'}`;
@@ -290,24 +301,47 @@ function pega(ms,p,eje){let best=null,bd=.06;nodos(ms).forEach(n=>{let d;
     if(eje==='h'){if(n.h)return;const fuera=Math.max(0,(n.y1??n.y)-.08-p[1],p[1]-(n.y2??n.y)-.08);d=Math.abs(p[0]-n.x)+fuera}
     else{if(n.v)return;const fuera=Math.max(0,(n.x1??n.x)-.08-p[0],p[0]-(n.x2??n.x)-.08);d=Math.abs(p[1]-n.y)+fuera}
     if(d<bd){bd=d;best=n}});return best}
-function dibujaMarcas(x,w,W,H,s,guias){
-  const ms=w.foto.marcas,lw=Math.max(3,W/260),fs=Math.max(16,W/40);x.font=`700 ${fs}px sans-serif`;x.lineCap='round';
-  const rot=(t,tx,ty,c)=>{const tw=x.measureText(t).width;tx=Math.max(4,Math.min(tx,W-tw-8));ty=Math.max(fs+4,Math.min(ty,H-6));x.fillStyle='rgba(0,0,0,.72)';x.fillRect(tx-4,ty-fs,tw+8,fs*1.25);x.fillStyle=c;x.fillText(t,tx,ty)};
-  ms.forEach((m,i)=>{const c=COL[m.tipo]||'#fff',on=i===s;x.strokeStyle=c;x.fillStyle=c;x.lineWidth=on?lw*2:lw;x.setLineDash([]);
-    if(m.forma==='cota')return;const p=m.p.map((v,k)=>v*(k%2?H:W));
+function dibujaMarcas(x,w,W,H,s,guias,reg){
+  const ms=w.foto.marcas,lw=Math.max(3,W/260),fs=Math.max(18,W/36);x.font=`700 ${fs}px sans-serif`;x.lineCap='round';
+  const rot=(t,tx,ty,c,ed,vacio)=>{const tw=x.measureText(t).width;tx=Math.max(4,Math.min(tx,W-tw-12));ty=Math.max(fs+6,Math.min(ty,H-8));
+    x.fillStyle=vacio?'rgba(200,55,30,.92)':'rgba(0,0,0,.75)';x.fillRect(tx-6,ty-fs-2,tw+12,fs*1.35);if(ed){x.strokeStyle=c;x.lineWidth=Math.max(1.5,lw/2);x.strokeRect(tx-6,ty-fs-2,tw+12,fs*1.35)}
+    x.fillStyle=vacio?'#fff':c;x.fillText(t,tx,ty);if(ed&&reg)reg.push({x:tx-6,y:ty-fs-2,w:tw+12,h:fs*1.35,...ed})};
+  const num=v=>v==null?null:cm(v);
+  ms.forEach((m,i)=>{const t=TIPOS[m.tipo];if(!t||m.forma==='cota')return;const c=COL[m.tipo]||'#fff',on=i===s,d=m.datos||{},p=m.p.map((v,k)=>v*(k%2?H:W));x.strokeStyle=c;x.fillStyle=c;x.lineWidth=on?lw*2:lw;x.setLineDash([]);
     if(m.forma==='marco'||m.forma==='caja'){const bx=Math.min(p[0],p[2]),by=Math.min(p[1],p[3]),bw=Math.abs(p[2]-p[0]),bh=Math.abs(p[3]-p[1]);
       if(m.forma==='marco')x.setLineDash([lw*4,lw*3]);x.strokeRect(bx,by,bw,bh);x.setLineDash([]);if(on){x.globalAlpha=.15;x.fillRect(bx,by,bw,bh);x.globalAlpha=1}
-      rot(etiquetaDe(w,m),bx+lw,m.forma==='marco'?by+bh-lw*2:by-lw*2,c)}
-    else{x.beginPath();x.arc(p[0],p[1],lw*3.5,0,7);x.fill();rot(etiquetaDe(w,m),p[0]+lw*5,p[1]-lw*3,c)}});
+      if(m.forma==='marco'){const a=num(w.largo),h=num(w.altura);rot(a?`↔ ${a}`:'↔ ancho ?',bx+bw/2-fs*2,by+bh-lw*3,c,{id:m.id,key:'largo'},!a);rot(h?`↕ ${h}`:'↕ alto ?',bx+lw*3,by+bh/2,c,{id:m.id,key:'altura'},!h)}
+      else{rot(nombreN(ms,m),bx,by-lw*2,c);const tieneA=t.c.some(([k])=>k==='alto');
+        rot(d.ancho!=null?`↔ ${num(d.ancho)}`:'↔ ?',bx+bw/2-fs*1.5,by+bh-lw*3,c,{id:m.id,key:'ancho'},d.ancho==null);
+        if(tieneA)rot(d.alto!=null?`↕ ${num(d.alto)}`:'↕ ?',bx+bw-fs*3.2,by+bh/2,c,{id:m.id,key:'alto'},d.alto==null)}}
+    else{x.beginPath();x.arc(p[0],p[1],lw*3.5,0,7);x.fill();rot(nombreN(ms,m),p[0]+lw*5,p[1]-lw*3,c)}});
   ms.forEach((m,i)=>{if(m.forma!=='cota')return;const d=m.datos,c=COL.cota,on=i===s,p=m.p.map((v,k)=>v*(k%2?H:W));x.strokeStyle=c;x.lineWidth=on?lw*1.6:lw*.9;
     let a=[p[0],p[1]],b=[p[2],p[3]];
     if(d.a&&d.b){const ca=coordFoto(ms,d.a,d.eje),cb=coordFoto(ms,d.b,d.eje);if(ca!=null&&cb!=null){if(d.eje==='h'){const y=(p[1]+p[3])/2;a=[ca*W,y];b=[cb*W,y]}else{const xx=(p[0]+p[2])/2;a=[xx,ca*H];b=[xx,cb*H]}}}
     x.beginPath();x.moveTo(a[0],a[1]);x.lineTo(b[0],b[1]);x.stroke();const ang=Math.atan2(b[1]-a[1],b[0]-a[0]),q=lw*3;
     [a,b].forEach(([u,v])=>{x.beginPath();x.moveTo(u-q*Math.sin(ang),v+q*Math.cos(ang));x.lineTo(u+q*Math.sin(ang),v-q*Math.cos(ang));x.stroke()});
     if(!(d.a&&d.b)){x.setLineDash([lw,lw*2]);x.strokeRect(a[0]-lw*2,a[1]-lw*2,lw*4,lw*4);x.setLineDash([])}
-    rot(etiquetaDe(w,m),(a[0]+b[0])/2+lw*2,(a[1]+b[1])/2-lw*2,c)});
+    const v=d.valor!=null?cm(d.valor)+(d.nota?' '+d.nota:''):(d.nota||'?');rot(v,(a[0]+b[0])/2-fs,(a[1]+b[1])/2-lw*2,c,{id:m.id,key:'valor'},d.valor==null&&!d.nota)});
   if(guias){x.fillStyle='#c6f000';nodos(ms).forEach(n=>{x.beginPath();x.arc(n.x*W,n.y*H,lw*1.8,0,7);x.fill()})}
 }
+/* ---------- escribir la medida sobre la foto ---------- */
+let EDIT=null;const LBL={};
+function vacios(w,m){const t=TIPOS[m.tipo],d=m.datos||{};if(m.tipo==='marco')return['largo','altura'].filter(k=>w[k]==null);
+  if(m.tipo==='cota')return d.valor==null?['valor']:[];return t.c.filter(([k])=>k!=='sobresale'&&d[k]==null).map(([k])=>k)}
+function abreEdicion(i,id,key){EDIT={i,id,key};pinta(i)}
+function muestraInput(i){const c=$('cv'+i),cont=c&&c.parentElement;if(!cont||!EDIT||EDIT.i!==i)return;const w=E().muros[i],m=w.foto.marcas.find(q=>q.id===EDIT.id);
+  const old=cont.querySelector('.inl');if(old)old.remove();if(!m){EDIT=null;return}
+  const L=(LBL[i]||[]).find(r=>r.id===EDIT.id&&r.key===EDIT.key);if(!L){EDIT=null;return}
+  const rc=c.getBoundingClientRect(),rp=cont.getBoundingClientRect(),k=rc.width/c.width,inp=document.createElement('input');
+  inp.className='inl';inp.inputMode='decimal';inp.enterKeyHint='next';
+  const cur=EDIT.key==='largo'||EDIT.key==='altura'?w[EDIT.key]:m.datos[EDIT.key];inp.value=cm(cur);
+  inp.placeholder={largo:'ancho cm',altura:'alto cm',ancho:'ancho cm',alto:'alto cm',valor:'medida cm'}[EDIT.key]||'cm';
+  cont.appendChild(inp);const lx=rc.left-rp.left+L.x*k,ly=rc.top-rp.top+L.y*k;
+  inp.style.left=Math.max(4,Math.min(lx,cont.clientWidth-inp.offsetWidth-4))+'px';inp.style.top=Math.max(4,Math.min(ly,cont.clientHeight-inp.offsetHeight-4))+'px';
+  inp.focus({preventScroll:true});setTimeout(()=>inp.scrollIntoView({block:'center',behavior:'smooth'}),250);
+  let hecho=false;const fin=sig=>{if(hecho)return;hecho=true;const v=mm(inp.value),key=EDIT.key;if(inp.value.trim()!==''||cur!=null){snap();if(key==='largo'||key==='altura')w[key]=v;else m.datos[key]=v;guardar()}
+    const resto=vacios(w,m).filter(q=>q!==key);EDIT=sig&&resto.length?{i,id:m.id,key:resto[0]}:null;render(true)};
+  inp.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();fin(true)}if(ev.key==='Escape'){hecho=true;EDIT=null;render(true)}};inp.onblur=()=>fin(false)}
 const Z={};
 function aplicaZoom(i){const c=$('cv'+i),z=Z[i];if(!c)return;if(!z||z.s<=1.01){c.style.transform='';Z[i]={s:1,x:0,y:0};const b=document.querySelector(`[data-z1="${i}"]`);if(b)b.style.display='none';return}
   const W=c.parentElement.clientWidth,H=c.parentElement.clientHeight;z.x=Math.min(0,Math.max(W-W*z.s,z.x));z.y=Math.min(0,Math.max(H-H*z.s,z.y));c.style.transformOrigin='0 0';c.style.transform=`translate(${z.x}px,${z.y}px) scale(${z.s})`;const b=document.querySelector(`[data-z1="${i}"]`);if(b)b.style.display='block'}
@@ -321,12 +355,14 @@ function eventos(i){
   const pos=ev=>{const r=c.getBoundingClientRect();return[(ev.clientX-r.left)/r.width,(ev.clientY-r.top)/r.height]};
   c.onpointerdown=ev=>{if(dedos.size>1)return;const p=pos(ev);
     if(V.m!==i){V.m=i;sel=-1;herr='sel';HIST=[];render(true);return}
-    if(herr==='sel'){sel=busca(p);pinta(i);editor();return}
+    if(herr==='sel'){const px=p[0]*c.width,py=p[1]*c.height,L=(LBL[i]||[]).find(r=>px>=r.x-8&&px<=r.x+r.w+8&&py>=r.y-8&&py<=r.y+r.h+8);
+      if(L){sel=E().muros[i].foto.marcas.findIndex(q=>q.id===L.id);editor();abreEdicion(i,L.id,L.key);return}
+      sel=busca(p);pinta(i);editor();return}
     c.setPointerCapture(ev.pointerId);const H=HERR[herr];
     if(H.f==='punto'){agrega({forma:'punto',p:[p[0],p[1]]},H.t[0]);return}
     ini=p;tmp={forma:H.f,p:[p[0],p[1],p[0],p[1]],tipo:H.t[0],datos:{}}};
   c.onpointermove=ev=>{if(!ini||dedos.size>1)return;const p=pos(ev);tmp.p=[ini[0],ini[1],p[0],p[1]];pinta(i);const x=c.getContext('2d'),w=E().muros[i];
-    dibujaMarcas(x,{...w,foto:{...w.foto,marcas:[...w.foto.marcas,tmp]}},c.width,c.height,w.foto.marcas.length,herr==='cota')};
+    dibujaMarcas(x,{...w,foto:{...w.foto,marcas:[...w.foto.marcas,{...tmp,id:'tmp'}]}},c.width,c.height,w.foto.marcas.length,herr==='cota')};
   c.onpointerup=ev=>{if(!ini||pinch)return;const p=pos(ev),q=ini,f=tmp.forma,t=tmp.tipo;ini=null;tmp=null;if(Math.hypot(p[0]-q[0],p[1]-q[1])<.03){pinta(i);return}agrega({forma:f,p:[q[0],q[1],p[0],p[1]]},t)};
 }
 function busca(p){const ms=M().foto.marcas;let best=-1,bd=.05;
@@ -341,25 +377,22 @@ function agrega(m,tipo){const w=M(),ms=w.foto.marcas,t=TIPOS[tipo];
   if(m.forma==='cota'){const im=IMGS[V.m]||{width:1,height:1},dx=(m.p[2]-m.p[0])*im.width,dy=(m.p[3]-m.p[1])*im.height,eje=Math.abs(dx)>=Math.abs(dy)?'h':'v';
     const a=pega(ms,[m.p[0],m.p[1]],eje),b=pega(ms,[m.p[2],m.p[3]],eje);m.datos={eje,a:a?{id:a.id,ref:a.ref}:null,b:b?{id:b.id,ref:b.ref}:null,valor:null,nota:''};
     if(a&&b&&a.id===b.id&&a.ref===b.ref)m.datos.b=null}
-  ms.push(m);sel=ms.length-1;herr='sel';guardar();render(true)}
+  ms.push(m);sel=ms.length-1;herr='sel';const vs=vacios(w,m);EDIT=vs.length?{i:V.m,id:m.id,key:vs[0]}:null;guardar();render(true)}
 function editor(){
-  const ed=$('ed'+V.m);if(!ed)return;const es=E(),w=M(),f=w.foto;if(!f||sel<0||!f.marcas[sel]){ed.innerHTML='';return}
-  const ms=f.marcas,m=ms[sel],t=TIPOS[m.tipo],d=m.datos,R=resuelve(w),p=R.pos[m.id]||{};let cuerpo='';
-  if(m.tipo==='marco')cuerpo=`<div class="g2"><div><label for="mV_largo">Ancho del muro (cm)</label><input id="mV_largo" inputmode="decimal" value="${cm(w.largo)}"></div><div><label for="mV_altura">Alto del muro (cm)</label><input id="mV_altura" inputmode="decimal" value="${cm(w.altura)}"></div></div>`;
-  else if(m.tipo==='cota'){const q=n=>{if(!n)return'sin pegar (cota libre)';const mm2=ms.find(x=>x.id===n.id);return mm2?`${nombreN(ms,mm2)} · ${REFN[n.ref]}`:'—'};
-    cuerpo=`<p class="hint" style="margin-top:0">${d.eje==='h'?'Horizontal':'Vertical'}: ${esc(q(d.a))} → ${esc(q(d.b))}${d.a&&d.b?'':'. Solo se muestra en la foto y el PDF.'}</p>
-     <div class="g2"><div><label for="mV_valor">Medida (cm)</label><input id="mV_valor" inputmode="decimal" value="${cm(d.valor)}"></div><div><label for="mN">Nota (opcional)</label><input id="mN" value="${esc(d.nota)}"></div></div>`}
-  else{const est=t.f==='punto'?(p.cx!=null&&p.cy!=null):(p.l!=null&&(t.completa||p.b!=null));
-    cuerpo=`<div class="g2"><div><label for="mT">Qué es</label><select id="mT">${(OPC[m.tipo]||[m.tipo]).map(k=>`<option value="${k}" ${k===m.tipo?'selected':''}>${TIPOS[k].n}</option>`).join('')}</select></div>
-      <div><label>Ubicación</label><p class="${est?'okt':'warn'}" style="margin:10px 0 0">${est?'✓ Amarrada con cotas':'Falta amarrarla con cotas'}</p></div></div>
-     ${t.c.length?`<div class="g3">${t.c.map(([k,l])=>`<div><label for="mV_${k}">${l}</label><input id="mV_${k}" inputmode="decimal" value="${cm(d[k])}"></div>`).join('')}</div>`:''}
-     <p class="hint">${t.regla?`Se mide ${t.regla}. `:''}${t.f==='punto'?'Pon una cota horizontal hacia una orilla y otra vertical hacia el piso o el techo.':t.completa?'Pon una cota horizontal desde una orilla del marco u otro elemento.':m.tipo==='ventana'?'Pon una cota horizontal que la ubique y una vertical del antepecho al piso.':t.techo?'Pon una cota horizontal que la ubique; se asume pegada al techo.':'Pon una cota horizontal que la ubique; se asume sobre el piso.'}</p>`}
-  ed.innerHTML=`<div class="pn" style="background:var(--bg)"><b>${esc(t.f==='cota'?'Cota':nombreN(ms,m))}</b>${cuerpo}
-    <div class="row" style="margin-top:10px;justify-content:space-between"><span class="hint">Medidas en cm</span><button class="s" id="mX">Borrar</button></div></div>`;
+  const ed=$('ed'+V.m);if(!ed)return;const w=M(),f=w.foto;if(!f||sel<0||!f.marcas[sel]){ed.innerHTML='';return}
+  const ms=f.marcas,m=ms[sel],t=TIPOS[m.tipo],d=m.datos,R=resuelve(w),p=R.pos[m.id]||{},op=OPC[m.tipo]||[m.tipo];
+  let est='';if(t.f==='caja'||t.f==='punto'){const ok=t.f==='punto'?(p.cx!=null&&p.cy!=null):(p.l!=null&&(t.completa||p.b!=null));est=`<span class="${ok?'okt':'warn'}" style="font-weight:700">${ok?'✓ ubicada':'⚠ falta cota'}</span>`}
+  const sob=t.c.some(([k])=>k==='sobresale');
+  ed.innerHTML=`<div class="row" style="margin:8px 0;gap:6px">
+    ${op.length>1?`<select id="mT" style="width:auto;flex:1">${op.map(k=>`<option value="${k}" ${k===m.tipo?'selected':''}>${TIPOS[k].n}</option>`).join('')}</select>`:`<b style="flex:1">${esc(t.f==='cota'?'Cota':nombreN(ms,m))}</b>`}
+    ${sob?`<input id="mV_sobresale" inputmode="decimal" placeholder="sobresale cm" value="${cm(d.sobresale)}" style="width:8.5em">`:''}
+    ${m.tipo==='cota'?`<input id="mN" placeholder="nota" value="${esc(d.nota)}" style="width:8em">`:''}
+    ${est}<button class="s" id="mX" style="min-height:44px">Borrar</button></div>
+    ${t.regla?`<p class="hint" style="margin-top:0">Se mide ${t.regla}.</p>`:''}`;
   if($('mT'))$('mT').onchange=ev=>{snap();m.tipo=ev.target.value;guardar();pinta();editor()};
   if($('mN'))$('mN').onchange=ev=>{snap();d.nota=ev.target.value;guardar();pinta()};
-  ed.querySelectorAll('input[id^="mV_"]').forEach(inp=>inp.onchange=ev=>{snap();const k=inp.id.slice(3),v=mm(ev.target.value);if(k==='largo'||k==='altura')w[k]=v;else d[k]=v;guardar();render(true)});
-  $('mX').onclick=()=>{snap();const id=m.id;f.marcas.splice(sel,1);f.marcas.forEach(q=>{if(q.tipo==='cota'){if(q.datos.a&&q.datos.a.id===id)q.datos.a=null;if(q.datos.b&&q.datos.b.id===id)q.datos.b=null}});sel=-1;guardar();render(true)};
+  if($('mV_sobresale'))$('mV_sobresale').onchange=ev=>{snap();d.sobresale=mm(ev.target.value);guardar();render(true)};
+  $('mX').onclick=()=>{snap();const id=m.id;f.marcas.splice(sel,1);f.marcas.forEach(q=>{if(q.tipo==='cota'){if(q.datos.a&&q.datos.a.id===id)q.datos.a=null;if(q.datos.b&&q.datos.b.id===id)q.datos.b=null}});sel=-1;EDIT=null;guardar();render(true)};
 }
 
 /* ---------- fotos ---------- */
